@@ -11,10 +11,10 @@ resource "helm_release" "argo_cd" {
 }
 
 locals {
-  repo_url       = "https://github.com/podtato-head/podtato-head-app"
-  repo_path      = "deploy"
-  app_name       = "podtato-head"
-  app_namespace  = "podtato-head"
+  repo_url       = "https://github.com/tahmo123/INFRA-G5.git"
+  repo_path      = "kubernetes/example-app"
+  app_name       = "example-app"
+  app_namespace  = "example-app"
 }
 
 resource "helm_release" "argo_cd_app" {

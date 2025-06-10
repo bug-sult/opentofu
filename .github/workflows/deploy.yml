@@ -1,0 +1,56 @@
+name: Deploy Infrastructure and Applications
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  EXOSCALE_API_KEY: ${{ secrets.EXOSCALE_API_KEY }}
+  EXOSCALE_API_SECRET: ${{ secrets.EXOSCALE_API_SECRET }}
+
+jobs:
+  terraform:
+    name: 'Terraform'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+
+    - name: Terraform Init
+      run: |
+        cd terraform
+        terraform init
+
+    - name: Terraform Plan
+      run: |
+        cd terraform
+        terraform plan -var="exoscale_key=${{ secrets.EXOSCALE_API_KEY }}" -var="exoscale_secret=${{ secrets.EXOSCALE_API_SECRET }}"
+
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        cd terraform
+        terraform apply -auto-approve -var="exoscale_key=${{ secrets.EXOSCALE_API_KEY }}" -var="exoscale_secret=${{ secrets.EXOSCALE_API_SECRET }}"
+
+    - name: Wait for ArgoCD
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        cd terraform
+        kubectl --kubeconfig=./kubeconfig.yaml wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
+        kubectl --kubeconfig=./kubeconfig.yaml wait --for=condition=available --timeout=600s deployment/argocd-application-controller -n argocd
+
+    - name: Get ArgoCD Admin Password
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        cd terraform
+        echo "ArgoCD Admin Password:"
+        kubectl --kubeconfig=./kubeconfig.yaml -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
