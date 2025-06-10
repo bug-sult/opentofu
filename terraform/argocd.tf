@@ -11,7 +11,7 @@ resource "helm_release" "argo_cd" {
 }
 
 locals {
-  repo_url       = "https://github.com/tahmo123/INFRA-G5.git"
+  repo_url       = "https://github.com/bug-sult/opentofu.git"
   repo_path      = "kubernetes/example-app"
   app_name       = "example-app"
   app_namespace  = "example-app"

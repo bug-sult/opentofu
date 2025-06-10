@@ -1,212 +1,234 @@
-# Infrastructure as Code (IaC) mit GitOps auf Exoscale
+# OpenTofu Infrastructure with GitOps on Exoscale
 
-Dieses Repository enthält die notwendige Infrastruktur-Konfiguration für die Bereitstellung eines Kubernetes-Clusters auf Exoscale mit GitOps-Implementierung durch ArgoCD.
+This repository contains the infrastructure configuration for deploying a Kubernetes cluster on Exoscale using OpenTofu (an open source alternative to Terraform) with GitOps implementation using ArgoCD.
 
-## Projektstruktur
+## Quick Access URLs
+
+To get the URLs for accessing your applications:
+
+1. Get the Node IP:
+```bash
+kubectl --kubeconfig=terraform/kubeconfig get nodes -o wide
+```
+Example output:
+```
+NAME               STATUS   ROLES    AGE   VERSION   INTERNAL-IP      EXTERNAL-IP      OS-IMAGE             KERNEL-VERSION     CONTAINER-RUNTIME
+pool-xxxxx-xxxxx   Ready    <none>   1h    v1.33.1   138.124.210.10   138.124.210.10   Ubuntu 24.04.2 LTS   6.8.0-60-generic   containerd://2.1.0
+```
+Use the EXTERNAL-IP from the output (e.g., 138.124.210.10)
+
+2. Access URLs:
+- ArgoCD UI: https://<node-ip>:30081 (e.g., https://138.124.210.10:30081)
+  - Username: admin
+  - Password: Get it by running:
+    ```bash
+    kubectl --kubeconfig=terraform/kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+    ```
+- Example Application: http://<node-ip>:30080 (e.g., http://138.124.210.10:30080)
+
+3. Verify the services are running:
+```bash
+# Check ArgoCD service
+kubectl --kubeconfig=terraform/kubeconfig get svc -n argocd argocd-server
+
+# Check example application service
+kubectl --kubeconfig=terraform/kubeconfig get svc -n example-app example-app-service
+
+# Check if pods are running
+kubectl --kubeconfig=terraform/kubeconfig get pods -n example-app
+```
+
+## Project Structure
 
 ```
-INFRA-G5/
+opentofu/
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml          # GitHub Actions Workflow
 ├── kubernetes/
-│   └── example-app/           # Kubernetes Manifeste
-│       ├── namespace.yaml
-│       ├── deployment.yaml
-│       └── service.yaml
-├── terraform/                  # Terraform Konfigurationen
-│   ├── argocd.tf              # ArgoCD Installation
-│   ├── main.tf                # Exoscale Cluster
-│   ├── variables.tf           # Variablen Definition
-│   ├── provider.tf            # Provider Konfiguration
-│   └── terraform.tfvars       # Variablen Werte
+│   └── example-app/           # Kubernetes Manifests
+│       ├── namespace.yaml     # Application Namespace
+│       ├── deployment.yaml    # Nginx Deployment
+│       └── service.yaml       # NodePort Service
+├── terraform/                 # OpenTofu/Terraform Configurations
+│   ├── argocd.tf             # ArgoCD Installation
+│   ├── main.tf               # Exoscale Cluster
+│   ├── variables.tf          # Variables Definition
+│   ├── provider.tf           # Provider Configuration
+│   └── terraform.tfvars      # Variables Values (create this)
 └── README.md
 ```
 
-## Voraussetzungen
+## Prerequisites
 
 1. GitHub Account
-2. Exoscale Account
-3. Terraform CLI (Version 1.5.0 oder höher)
+2. Exoscale Account with API credentials
+3. OpenTofu/Terraform CLI (Version 1.5.0 or higher)
 4. kubectl
 5. Git
 
-## Einrichtungsschritte
+## Setup Instructions
 
-### 1. Repository Vorbereitung
+### 1. Repository Setup
 
-1. Klonen Sie das Repository:
+1. Clone the repository:
    ```bash
-   git clone https://github.com/tahmo123/INFRA-G5.git
-   cd INFRA-G5
+   git clone https://github.com/bug-sult/opentofu.git
+   cd opentofu
    ```
 
-### 2. Exoscale Konfiguration
+### 2. Exoscale Configuration
 
-1. Loggen Sie sich in Ihren Exoscale Account ein
-2. Navigieren Sie zu IAM → API Keys
-3. Erstellen Sie einen neuen API Key
-4. Notieren Sie sich:
+1. Log into your Exoscale account
+2. Navigate to IAM → API Keys
+3. Create a new API Key
+4. Note down:
    - API Key
    - API Secret
 
-### 3. GitHub Secrets Konfiguration
+### 3. Configure GitHub Secrets
 
-1. Gehen Sie zu Ihrem GitHub Repository
-2. Navigieren Sie zu Settings → Secrets and variables → Actions
-3. Fügen Sie folgende Secrets hinzu:
-   - \`EXOSCALE_API_KEY\`: Ihr Exoscale API Key
-   - \`EXOSCALE_API_SECRET\`: Ihr Exoscale API Secret
+1. Go to your GitHub repository
+2. Navigate to Settings → Secrets and variables → Actions
+3. Add the following secrets:
+   - `EXOSCALE_API_KEY`: Your Exoscale API Key
+   - `EXOSCALE_API_SECRET`: Your Exoscale API Secret
 
-### 4. Terraform Konfiguration
+### 4. Configure Local Environment
 
-Die Terraform-Konfiguration ist bereits im \`terraform/\` Verzeichnis vorhanden und enthält:
-- Exoscale SKS (Kubernetes) Cluster-Definition
-- ArgoCD Installation via Helm
-- Security Group Konfiguration
-- Nodepool Konfiguration
+1. Create terraform.tfvars in the terraform directory:
+   ```bash
+   cd terraform
+   ```
 
-### 5. ArgoCD Konfiguration
+2. Create a file named `terraform.tfvars` with the following content:
+   ```hcl
+   exoscale_key    = "your-api-key"
+   exoscale_secret = "your-api-secret"
+   cluster_name    = "my-cluster"
+   ```
 
-Die ArgoCD-Konfiguration in \`terraform/argocd.tf\` ist bereits eingerichtet für:
-- Installation via Helm Chart
-- Automatische Synchronisation mit dem Repository
-- Deployment der Beispiel-Applikation
+### 5. Deploy Infrastructure
 
-### 6. Deployment
+The deployment process is automated through GitHub Actions:
 
-Der Deployment-Prozess wird automatisch durch GitHub Actions gesteuert:
-
-1. Push in den main Branch startet den Workflow:
+1. Push your changes to the main branch:
    ```bash
    git add .
-   git commit -m "Initial setup"
+   git commit -m "Update configuration"
    git push origin main
    ```
 
-2. Der Workflow:
-   - Initialisiert Terraform
-   - Erstellt den Exoscale Kubernetes Cluster
-   - Installiert ArgoCD
-   - Deployed die Beispiel-Applikation
+2. The workflow will:
+   - Initialize OpenTofu
+   - Create the Exoscale Kubernetes cluster
+   - Install ArgoCD
+   - Deploy the example application
 
-### 7. Zugriff auf die Infrastruktur
+### 6. Access Your Applications
 
-1. ArgoCD UI Zugriff:
+#### Accessing ArgoCD UI
+
+1. Get the kubeconfig:
    ```bash
-   kubectl --kubeconfig=terraform/kubeconfig.yaml port-forward svc/argocd-server -n argocd 8080:443
+   # If using GitHub Actions, the kubeconfig will be in terraform/kubeconfig
    ```
+
+2. Port forward ArgoCD service:
+   ```bash
+   kubectl --kubeconfig=terraform/kubeconfig port-forward svc/argocd-server -n argocd 8080:443
+   ```
+
+3. Access ArgoCD:
    - URL: https://localhost:8080
-   - Benutzername: admin
-   - Passwort: Wird am Ende des GitHub Actions Workflow angezeigt
+   - Username: admin
+   - Password: Get it by running:
+     ```bash
+     kubectl --kubeconfig=terraform/kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+     ```
 
-2. Beispiel-Applikation Zugriff:
+#### Accessing Example Application
+
+1. Get node IP:
    ```bash
-   # Node-IP finden
-   kubectl --kubeconfig=terraform/kubeconfig.yaml get nodes -o wide
+   kubectl --kubeconfig=terraform/kubeconfig get nodes -o wide
    ```
+
+2. Access the application:
    - URL: http://<node-ip>:30080
+   - The example nginx application is exposed on port 30080
 
-## Komponenten im Detail
+## Monitoring and Troubleshooting
 
-### GitHub Actions Workflow
-- Automatisierte Infrastruktur-Bereitstellung
-- Terraform Ausführung
-- ArgoCD Installation
-- Statusüberprüfung
+### Check Application Status
 
-### Terraform Konfiguration
-- Exoscale SKS Cluster
-- ArgoCD Helm Chart
-- Security Groups
-- Nodepool Management
-
-### Kubernetes Manifeste
-- Namespace Definition
-- Nginx Deployment
-- NodePort Service
-
-### ArgoCD
-- Automatische Synchronisation
-- GitOps Workflow
-- Applikations-Deployment
-
-## Troubleshooting
-
-### ArgoCD Sync Status prüfen
 ```bash
-kubectl --kubeconfig=terraform/kubeconfig.yaml get applications -n argocd
+# Check ArgoCD application status
+kubectl --kubeconfig=terraform/kubeconfig get applications -n argocd
+
+# Check pods status
+kubectl --kubeconfig=terraform/kubeconfig get pods -n example-app
+
+# Check ArgoCD logs
+kubectl --kubeconfig=terraform/kubeconfig logs -n argocd deployment/argocd-application-controller
 ```
 
-### ArgoCD Logs anzeigen
+### Common Issues and Solutions
+
+1. If ArgoCD sync fails:
+   ```bash
+   kubectl --kubeconfig=terraform/kubeconfig -n argocd get applications
+   kubectl --kubeconfig=terraform/kubeconfig -n argocd describe applications example-app
+   ```
+
+2. If pods are not running:
+   ```bash
+   kubectl --kubeconfig=terraform/kubeconfig -n example-app describe pods
+   ```
+
+## Infrastructure Management
+
+### Scaling the Application
+
+1. Horizontal Scaling (number of pods):
+   Edit `kubernetes/example-app/deployment.yaml`:
+   ```yaml
+   spec:
+     replicas: 2  # Modify this number
+   ```
+
+2. Vertical Scaling (node size):
+   Edit `terraform/main.tf`:
+   ```hcl
+   resource "exoscale_sks_nodepool" "my_sks_nodepool" {
+     instance_type = "standard.medium"  # Modify instance type
+     size          = 1                 # Modify number of nodes
+   }
+   ```
+
+### Updating Applications
+
+1. ArgoCD automatically syncs changes from the repository
+2. To manually trigger sync:
+   ```bash
+   kubectl --kubeconfig=terraform/kubeconfig -n argocd get applications
+   kubectl --kubeconfig=terraform/kubeconfig -n argocd app sync example-app
+   ```
+
+## Security Best Practices
+
+1. Never commit sensitive information (API keys, secrets) to the repository
+2. Use GitHub Secrets for sensitive values
+3. Regularly update ArgoCD and other components
+4. Review Security Group rules in terraform/main.tf
+
+## Cleanup
+
+To destroy the infrastructure:
+
 ```bash
-kubectl --kubeconfig=terraform/kubeconfig.yaml logs -n argocd deployment/argocd-application-controller
+cd terraform
+terraform destroy -var="exoscale_key=your-key" -var="exoscale_secret=your-secret"
 ```
 
-### Pod Status überprüfen
-```bash
-kubectl --kubeconfig=terraform/kubeconfig.yaml get pods -n example-app
-```
-
-## Best Practices
-
-1. **Versionskontrolle**
-   - Commiten Sie alle Änderungen
-   - Nutzen Sie aussagekräftige Commit-Messages
-   - Verwenden Sie Feature Branches
-
-2. **Sicherheit**
-   - Speichern Sie keine Secrets im Repository
-   - Nutzen Sie GitHub Secrets
-   - Überprüfen Sie regelmäßig die Zugriffsrechte
-
-3. **GitOps**
-   - Alle Änderungen über Git
-   - Automatische Synchronisation
-   - Nachvollziehbare Änderungshistorie
-
-## Wartung und Updates
-
-### ArgoCD Updates
-```bash
-# Version in argocd.tf aktualisieren
-version = "8.0.0" # Neue Version eintragen
-```
-
-### Cluster Updates
-- Exoscale führt Kubernetes Updates automatisch durch
-- Node Pool Updates über Terraform möglich
-
-## Backup und Disaster Recovery
-
-### Terraform State
-- Wird lokal gespeichert
-- Empfehlung: Nutzung von Terraform Cloud oder S3 Backend
-
-### Kubernetes Ressourcen
-- Durch GitOps automatisch wiederherstellbar
-- Repository dient als Single Source of Truth
-
-## Monitoring und Logging
-
-Empfohlene zusätzliche Tools:
-- Prometheus für Monitoring
-- Grafana für Visualisierung
-- ELK Stack für Logging
-
-## Skalierung
-
-### Horizontale Skalierung
-```yaml
-# In deployment.yaml
-spec:
-  replicas: 2 # Anzahl erhöhen
-```
-
-### Vertikale Skalierung
-```hcl
-# In terraform/main.tf
-resource "exoscale_sks_nodepool" "my_sks_nodepool" {
-  instance_type = "standard.medium" # Instance Typ anpassen
-  size          = 1 # Anzahl der Nodes erhöhen
-}
+Note: This will destroy all resources including the Kubernetes cluster and all applications.
