@@ -11,10 +11,25 @@ resource "helm_release" "argo_cd" {
 }
 
 locals {
-  repo_url       = "https://github.com/bug-sult/opentofu.git"
-  repo_path      = "kubernetes/example-app"
-  app_name       = "example-app"
-  app_namespace  = "example-app"
+  repo_url = "https://github.com/bug-sult/opentofu.git"
+  
+  applications = [
+    {
+      name      = "example-app"
+      path      = "kubernetes/example-app"
+      namespace = "example-app"
+    },
+    {
+      name      = "keycloak"
+      path      = "kubernetes/keycloak"
+      namespace = "keycloak"
+    },
+    {
+      name      = "movie-app"
+      path      = "kubernetes/movie-app"
+      namespace = "movie-app"
+    }
+  ]
 }
 
 resource "helm_release" "argo_cd_app" {
@@ -28,10 +43,8 @@ resource "helm_release" "argo_cd_app" {
   lint             = true
   wait             = true
   values = [templatefile("app-values.yaml", {
-    repo_url       = local.repo_url,
-    repo_path      = local.repo_path,
-    app_name       = local.app_name,
-    app_namespace  = local.app_namespace
+    repo_url      = local.repo_url,
+    applications  = local.applications
   })]
 
   depends_on = [

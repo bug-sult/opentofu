@@ -1,6 +1,24 @@
-# OpenTofu Infrastructure with GitOps on Exoscale
+# OpenTofu Infrastructure with Movie Library and Keycloak Authentication
 
-This repository contains the infrastructure configuration for deploying a Kubernetes cluster on Exoscale using OpenTofu (an open source alternative to Terraform) with GitOps implementation using ArgoCD.
+This repository contains the infrastructure configuration for deploying a Kubernetes cluster on Exoscale using OpenTofu with GitOps implementation using ArgoCD. It includes a Movie Library application with Keycloak authentication.
+
+## Applications Overview
+
+1. **Movie Library Application**
+   - Frontend: React-based UI for managing movies
+   - Backend: Node.js API with PostgreSQL database
+   - Features:
+     - Movie management (add, delete, list)
+     - Rating system
+     - Genre-based filtering
+     - Sorting by title, rating, and year
+   - Authentication via Keycloak
+
+2. **Keycloak Authentication**
+   - Secure authentication and authorization
+   - OAuth2/OpenID Connect integration
+   - Pre-configured realm and client
+   - Test user account included
 
 ## Quick Access URLs
 
@@ -18,13 +36,17 @@ pool-xxxxx-xxxxx   Ready    <none>   1h    v1.33.1   138.124.210.10   138.124.21
 Use the EXTERNAL-IP from the output (e.g., 138.124.210.10)
 
 2. Access URLs:
-- ArgoCD UI: https://<node-ip>:30081 (e.g., https://138.124.210.10:30081)
+- ArgoCD UI: https://<node-ip>:30081
   - Username: admin
   - Password: Get it by running:
     ```bash
     kubectl --kubeconfig=terraform/kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
     ```
-- Example Application: http://<node-ip>:30080 (e.g., http://138.124.210.10:30080)
+- Movie Library: http://<node-ip>:30083
+- Keycloak: http://<node-ip>:30082
+  - Admin Console: http://<node-ip>:30082/admin
+  - Admin credentials: admin/admin123
+  - Test user credentials: testuser/test123
 
 3. Verify the services are running:
 ```bash
@@ -40,22 +62,33 @@ kubectl --kubeconfig=terraform/kubeconfig get pods -n example-app
 
 ## Project Structure
 
+The project includes the following components:
+
 ```
 opentofu/
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml          # GitHub Actions Workflow
+│       └── deploy.yml                # GitHub Actions Workflow
 ├── kubernetes/
-│   └── example-app/           # Kubernetes Manifests
-│       ├── namespace.yaml     # Application Namespace
-│       ├── deployment.yaml    # Nginx Deployment
-│       └── service.yaml       # NodePort Service
-├── terraform/                 # OpenTofu/Terraform Configurations
-│   ├── argocd.tf             # ArgoCD Installation
-│   ├── main.tf               # Exoscale Cluster
-│   ├── variables.tf          # Variables Definition
-│   ├── provider.tf           # Provider Configuration
-│   └── terraform.tfvars      # Variables Values (create this)
+│   ├── movie-app/                   # Movie Library Application
+│   │   ├── frontend/               # React Frontend
+│   │   ├── backend/                # Node.js Backend
+│   │   ├── frontend-deployment.yaml
+│   │   ├── backend-deployment.yaml
+│   │   └── postgres-deployment.yaml
+│   ├── keycloak/                    # Keycloak Configuration
+│   │   ├── namespace.yaml
+│   │   ├── deployment.yaml
+│   │   └── service.yaml
+│   └── example-app/                 # Example Application
+├── terraform/                       # OpenTofu/Terraform Configurations
+│   ├── argocd.tf                   # ArgoCD Installation
+│   ├── main.tf                     # Exoscale Cluster
+│   ├── variables.tf                # Variables Definition
+│   ├── provider.tf                 # Provider Configuration
+│   └── terraform.tfvars            # Variables Values
+├── build-images.sh                  # Script to build Docker images
+├── keycloak-setup.sh               # Script to configure Keycloak
 └── README.md
 ```
 
@@ -66,6 +99,8 @@ opentofu/
 3. OpenTofu/Terraform CLI (Version 1.5.0 or higher)
 4. kubectl
 5. Git
+6. Docker (for building application images)
+7. jq (for Keycloak setup script)
 
 ## Setup Instructions
 
@@ -77,7 +112,21 @@ opentofu/
    cd opentofu
    ```
 
-### 2. Exoscale Configuration
+### 2. Build Application Images
+
+1. Make the build script executable:
+   ```bash
+   chmod +x build-images.sh
+   ```
+
+2. Run the build script:
+   ```bash
+   ./build-images.sh
+   ```
+
+### 3. Deploy Infrastructure and Applications
+
+1. Configure Exoscale:
 
 1. Log into your Exoscale account
 2. Navigate to IAM → API Keys
@@ -86,7 +135,7 @@ opentofu/
    - API Key
    - API Secret
 
-### 3. Configure GitHub Secrets
+2. Configure GitHub Secrets:
 
 1. Go to your GitHub repository
 2. Navigate to Settings → Secrets and variables → Actions
@@ -94,7 +143,7 @@ opentofu/
    - `EXOSCALE_API_KEY`: Your Exoscale API Key
    - `EXOSCALE_API_SECRET`: Your Exoscale API Secret
 
-### 4. Configure Local Environment
+3. Configure Local Environment:
 
 1. Create terraform.tfvars in the terraform directory:
    ```bash
@@ -108,7 +157,7 @@ opentofu/
    cluster_name    = "my-cluster"
    ```
 
-### 5. Deploy Infrastructure
+4. Deploy Infrastructure:
 
 The deployment process is automated through GitHub Actions:
 
@@ -125,7 +174,38 @@ The deployment process is automated through GitHub Actions:
    - Install ArgoCD
    - Deploy the example application
 
-### 6. Access Your Applications
+### 4. Configure Keycloak
+
+1. Make the Keycloak setup script executable:
+   ```bash
+   chmod +x keycloak-setup.sh
+   ```
+
+2. Wait for Keycloak to be ready (check pod status):
+   ```bash
+   kubectl --kubeconfig=terraform/kubeconfig get pods -n keycloak
+   ```
+
+3. Run the Keycloak setup script:
+   ```bash
+   ./keycloak-setup.sh
+   ```
+
+### 5. Access Your Applications
+
+1. Get the node IP:
+   ```bash
+   kubectl --kubeconfig=terraform/kubeconfig get nodes -o wide
+   ```
+
+2. Access the applications:
+   - Movie Library: http://<node-ip>:30083
+   - Keycloak: http://<node-ip>:30082
+   - ArgoCD: https://<node-ip>:30081
+
+3. Login to the Movie Library:
+   - Username: testuser
+   - Password: test123
 
 #### Accessing ArgoCD UI
 
@@ -163,14 +243,26 @@ The deployment process is automated through GitHub Actions:
 ### Check Application Status
 
 ```bash
+# Check all applications
+kubectl --kubeconfig=terraform/kubeconfig get pods --all-namespaces
+
+# Check Movie Library components
+kubectl --kubeconfig=terraform/kubeconfig get pods -n movie-app
+
+# Check Keycloak
+kubectl --kubeconfig=terraform/kubeconfig get pods -n keycloak
+
 # Check ArgoCD application status
 kubectl --kubeconfig=terraform/kubeconfig get applications -n argocd
 
-# Check pods status
-kubectl --kubeconfig=terraform/kubeconfig get pods -n example-app
+# Check logs for Movie Library backend
+kubectl --kubeconfig=terraform/kubeconfig logs -n movie-app deployment/movie-backend
 
-# Check ArgoCD logs
-kubectl --kubeconfig=terraform/kubeconfig logs -n argocd deployment/argocd-application-controller
+# Check logs for Movie Library frontend
+kubectl --kubeconfig=terraform/kubeconfig logs -n movie-app deployment/movie-frontend
+
+# Check logs for Keycloak
+kubectl --kubeconfig=terraform/kubeconfig logs -n keycloak deployment/keycloak
 ```
 
 ### Common Issues and Solutions

@@ -1,14 +1,16 @@
 applications:
-  - name: ${app_name}
+%{ for app in applications ~}
+  - name: ${app.name}
     project: default
     source:
       repoURL: ${repo_url}
       targetRevision: HEAD
-      path: ${repo_path}
+      path: ${app.path}
     destination:
       server: https://kubernetes.default.svc
-      namespace: ${app_namespace}
+      namespace: ${app.namespace}
     syncPolicy:
       automated: {}
       syncOptions:
         - CreateNamespace=true
+%{ endfor ~}
