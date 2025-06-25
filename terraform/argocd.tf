@@ -1,4 +1,5 @@
 resource "helm_release" "argo_cd" {
+  depends_on = [local_sensitive_file.kubeconfig]
   name             = "argocd"
   repository       = "https://argoproj.github.io/argo-helm"
   chart            = "argo-cd"
@@ -28,6 +29,7 @@ locals {
 }
 
 resource "helm_release" "argo_cd_app" {
+  depends_on = [helm_release.argo_cd]
   name             = "argocd-apps"
   repository       = "https://argoproj.github.io/argo-helm"
   chart            = "argocd-apps"
@@ -41,8 +43,4 @@ resource "helm_release" "argo_cd_app" {
     repo_url      = local.repo_url,
     applications  = local.applications
   })]
-
-  depends_on = [
-    helm_release.argo_cd
-  ]
 }

@@ -7,7 +7,7 @@ resource "exoscale_sks_cluster" "my_sks_cluster" {
 resource "exoscale_sks_nodepool" "my_sks_nodepool" {
   cluster_id    = exoscale_sks_cluster.my_sks_cluster.id
   zone          = exoscale_sks_cluster.my_sks_cluster.zone
-  name          = "${var.cluster_name}--nodepool"
+  name          = "gruppe5-test-np"
   instance_type = "standard.medium"
   size          = 2
   security_group_ids = [
@@ -18,7 +18,7 @@ resource "exoscale_sks_nodepool" "my_sks_nodepool" {
 
 # (ad-hoc security group)
 resource "exoscale_security_group" "my_sks_security_group" {
-  name = "my-sks-security-group-new"
+  name = "my-sks-security-group-new-1"
 }
 
 resource "exoscale_security_group_rule" "kubelet" {
