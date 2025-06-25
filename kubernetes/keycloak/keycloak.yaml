@@ -7,18 +7,24 @@ spec:
   instances: 1
   db:
     vendor: h2
-  hostname: keycloak.local
+  hostname:
+    hostname: keycloak.local
+    strict: false
+    strictHttps: false
+  http:
+    enabled: true
+    port: 8080
+  ingress:
+    enabled: false
+  features:
+    infinispan:
+      embedded: true
+  proxy:
+    enabled: true
+    reencrypt: false
   additionalOptions:
-    - name: http-enabled
-      value: "true"
-    - name: http-port
-      value: "8080"
     - name: proxy
       value: edge
-    - name: hostname-strict
-      value: "false"
-    - name: hostname-strict-https
-      value: "false"
     - name: log-level
       value: INFO
 ---

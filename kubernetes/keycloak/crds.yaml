@@ -21,7 +21,18 @@ spec:
               image:
                 type: string
               hostname:
-                type: string
+                type: object
+                properties:
+                  hostname:
+                    type: string
+                  admin:
+                    type: string
+                  strict:
+                    type: boolean
+                  strictHttps:
+                    type: boolean
+                  strictBackchannel:
+                    type: boolean
               tlsSecret:
                 type: string
               db:
@@ -52,8 +63,38 @@ spec:
               http:
                 type: object
                 properties:
+                  enabled:
+                    type: boolean
+                  port:
+                    type: integer
                   tlsSecret:
                     type: string
+              ingress:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  className:
+                    type: string
+                  annotations:
+                    type: object
+                    additionalProperties:
+                      type: string
+              features:
+                type: object
+                properties:
+                  infinispan:
+                    type: object
+                    properties:
+                      embedded:
+                        type: boolean
+              proxy:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  reencrypt:
+                    type: boolean
               additionalOptions:
                 type: array
                 items:
@@ -77,6 +118,10 @@ spec:
                       type: string
                     message:
                       type: string
+              instances:
+                type: integer
+              selector:
+                type: string
   scope: Namespaced
   names:
     plural: keycloaks
@@ -104,6 +149,7 @@ spec:
                 type: string
               realm:
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
           status:
             type: object
             properties:
@@ -117,6 +163,10 @@ spec:
                     status:
                       type: string
                     message:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                    reason:
                       type: string
   scope: Namespaced
   names:

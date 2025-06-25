@@ -63,10 +63,32 @@ Keycloak: http://<node-ip>:30082
 
 ## 🔐 Standard-Anmeldedaten
 
-| Service | Benutzername | Passwort | Hinweise |
-|---------|--------------|----------|----------|
-| ArgoCD | admin | Siehe Befehl* | *Siehe unten |
-| Keycloak | admin | admin | Standard-Anmeldedaten |
+| Service | Benutzername | Passwort | URL | Hinweise |
+|---------|--------------|----------|-----|----------|
+| ArgoCD | admin | Siehe Befehl* | https://<node-ip>:31770 | *Siehe unten |
+| Keycloak | admin | admin | http://<node-ip>:30083 | Standard-Anmeldedaten |
+
+### Keycloak Zugriff
+
+1. **Admin Console aufrufen**:
+   - URL: `http://<node-ip>:30083/admin`
+   - Benutzername: `admin`
+   - Passwort: `admin`
+
+2. **Erste Anmeldung**:
+   - Öffnen Sie die Admin Console URL
+   - Geben Sie die Standard-Anmeldedaten ein
+   - Bei der ersten Anmeldung werden Sie aufgefordert, das Passwort zu ändern
+
+3. **Sicherheitshinweise**:
+   - Ändern Sie das Standard-Admin-Passwort sofort nach der ersten Anmeldung
+   - Aktivieren Sie 2FA für den Admin-Account
+   - Erstellen Sie separate Benutzer für die Administration
+
+4. **Realm Management**:
+   - Der Standard "Master" Realm ist für die Administration
+   - Erstellen Sie neue Realms für Ihre Anwendungen
+   - Konfigurieren Sie Clients, Rollen und Benutzer im jeweiligen Realm
 
 *ArgoCD-Passwort abrufen:
 ```bash
