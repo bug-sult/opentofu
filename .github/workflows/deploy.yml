@@ -45,12 +45,35 @@ jobs:
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       run: |
         cd terraform
-        kubectl --kubeconfig=./kubeconfig.yaml wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
-        kubectl --kubeconfig=./kubeconfig.yaml wait --for=condition=available --timeout=600s deployment/argocd-application-controller -n argocd
+        kubectl --kubeconfig=./kubeconfig wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
+        kubectl --kubeconfig=./kubeconfig wait --for=condition=available --timeout=600s deployment/argocd-application-controller -n argocd
 
     - name: Get ArgoCD Admin Password
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       run: |
         cd terraform
         echo "ArgoCD Admin Password:"
-        kubectl --kubeconfig=./kubeconfig.yaml -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+        kubectl --kubeconfig=./kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+
+    - name: Sync ArgoCD Applications
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        cd terraform
+        echo "Syncing ArgoCD applications..."
+        kubectl --kubeconfig=./kubeconfig -n argocd get applications
+        
+    - name: Get Node IP and Service URLs
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        cd terraform
+        echo "Getting node IP..."
+        NODE_IP=$(kubectl --kubeconfig=./kubeconfig get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
+        echo "Node IP: $NODE_IP"
+        echo ""
+        echo "Application URLs:"
+        echo "ArgoCD UI: https://$NODE_IP:30081"
+        echo "Example App: http://$NODE_IP:30080"
+        echo ""
+        echo "ArgoCD Login:"
+        echo "Username: admin"
+        echo "Password: (see above output)"

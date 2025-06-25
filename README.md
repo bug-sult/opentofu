@@ -1,326 +1,254 @@
-# OpenTofu Infrastructure with Movie Library and Keycloak Authentication
+# OpenTofu GitOps Infrastructure
 
-This repository contains the infrastructure configuration for deploying a Kubernetes cluster on Exoscale using OpenTofu with GitOps implementation using ArgoCD. It includes a Movie Library application with Keycloak authentication.
+Vollständig automatisierte Infrastruktur mit OpenTofu (Terraform), Kubernetes und GitOps über ArgoCD. Diese Lösung demonstriert eine produktionsreife Infrastruktur mit automatischer Bereitstellung und Synchronisation.
 
-## Applications Overview
+## 🚀 Funktionen
 
-1. **Movie Library Application**
-   - Frontend: React-based UI for managing movies
-   - Backend: Node.js API with PostgreSQL database
-   - Features:
-     - Movie management (add, delete, list)
-     - Rating system
-     - Genre-based filtering
-     - Sorting by title, rating, and year
-   - Authentication via Keycloak
+- **Automatisierte Cluster-Erstellung** mit OpenTofu/Terraform
+- **GitOps-Deployment** mit ArgoCD
+- **Kontinuierliche Synchronisation** über GitHub Actions
+- **Beispielanwendung** zur Demonstration
 
-2. **Keycloak Authentication**
-   - Secure authentication and authorization
-   - OAuth2/OpenID Connect integration
-   - Pre-configured realm and client
-   - Test user account included
+## 📋 Anwendungen
 
-## Quick Access URLs
+| Anwendung | Beschreibung | Port |
+|-----------|--------------|------|
+| **Example App** | Nginx Frontend + Node.js Backend Demo | 30080 |
+| **ArgoCD** | GitOps-Management-Interface | 30081 |
 
-To get the URLs for accessing your applications:
+## ⚡ Schnellstart
 
-1. Get the Node IP:
+### 1. Repository Setup
 ```bash
-kubectl --kubeconfig=terraform/kubeconfig get nodes -o wide
+git clone https://github.com/bug-sult/opentofu.git
+cd opentofu
 ```
-Example output:
-```
-NAME               STATUS   ROLES    AGE   VERSION   INTERNAL-IP      EXTERNAL-IP      OS-IMAGE             KERNEL-VERSION     CONTAINER-RUNTIME
-pool-xxxxx-xxxxx   Ready    <none>   1h    v1.33.1   138.124.210.10   138.124.210.10   Ubuntu 24.04.2 LTS   6.8.0-60-generic   containerd://2.1.0
-```
-Use the EXTERNAL-IP from the output (e.g., 138.124.210.10)
 
-2. Access URLs:
-- ArgoCD UI: https://<node-ip>:30081
-  - Username: admin
-  - Password: Get it by running:
-    ```bash
-    kubectl --kubeconfig=terraform/kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-    ```
-- Movie Library: http://<node-ip>:30083
-- Keycloak: http://<node-ip>:30082
-  - Admin Console: http://<node-ip>:30082/admin
-  - Admin credentials: admin/admin123
-  - Test user credentials: testuser/test123
+### 2. Exoscale API-Schlüssel konfigurieren
 
-3. Verify the services are running:
+**GitHub Secrets einrichten:**
+1. Repository → Settings → Secrets and variables → Actions
+2. Folgende Secrets hinzufügen:
+   - `EXOSCALE_API_KEY`: Ihr Exoscale API Key
+   - `EXOSCALE_API_SECRET`: Ihr Exoscale API Secret
+
+### 3. Automatische Bereitstellung
+
 ```bash
-# Check ArgoCD service
-kubectl --kubeconfig=terraform/kubeconfig get svc -n argocd argocd-server
+# Änderungen committen und pushen
+git add .
+git commit -m "Initial deployment"
+git push origin main
+```
 
-# Check example application service
-kubectl --kubeconfig=terraform/kubeconfig get svc -n example-app example-app-service
+**Das passiert automatisch:**
+1. ✅ Kubernetes-Cluster wird auf Exoscale erstellt
+2. ✅ ArgoCD wird installiert und konfiguriert
+3. ✅ Example App wird automatisch bereitgestellt
+4. ✅ URLs werden in den GitHub Actions Logs angezeigt
 
-# Check if pods are running
+### 4. Zugriff auf Anwendungen
+
+Nach der Bereitstellung finden Sie die URLs in den GitHub Actions Logs:
+
+```
+Application URLs:
+ArgoCD UI: https://<node-ip>:30081
+Example App: http://<node-ip>:30080
+```
+
+## 🔐 Standard-Anmeldedaten
+
+| Service | Benutzername | Passwort | Hinweise |
+|---------|--------------|----------|----------|
+| ArgoCD | admin | Siehe Befehl* | *Siehe unten |
+
+*ArgoCD-Passwort abrufen:
+```bash
+kubectl --kubeconfig=terraform/kubeconfig -n argocd get secret \
+  argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+```
+
+## 🏗️ Architektur
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   GitHub Repo   │───▶│ GitHub Actions  │───▶│  Exoscale SKS   │
+│                 │    │                 │    │    Cluster     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                       │
+                                                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   ArgoCD UI     │◀───│     ArgoCD      │◀───│   Kubernetes    │
+│                 │    │   Controller    │    │   Applications  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+## 🔄 GitOps-Workflow
+
+1. **Code-Änderung** → Repository pushen
+2. **GitHub Actions** → Terraform apply (bei Infrastruktur-Änderungen)
+3. **ArgoCD** → Automatische Synchronisation der Anwendungen
+4. **Kubernetes** → Rolling Updates der Services
+
+### Neue Anwendung hinzufügen
+
+1. **Kubernetes-Manifeste erstellen:**
+```bash
+mkdir kubernetes/neue-app
+# Erstellen Sie namespace.yaml, deployment.yaml, service.yaml
+```
+
+2. **ArgoCD-Konfiguration erweitern:**
+```hcl
+# In terraform/argocd.tf
+applications = [
+  # ... bestehende Apps
+  {
+    name      = "neue-app"
+    path      = "kubernetes/neue-app"
+    namespace = "neue-app"
+  }
+]
+```
+
+3. **Automatische Bereitstellung:**
+```bash
+git add .
+git commit -m "Add neue-app"
+git push origin main
+```
+
+## 📊 Monitoring & Management
+
+### Status überprüfen
+```bash
+# Alle Pods anzeigen
+kubectl --kubeconfig=terraform/kubeconfig get pods --all-namespaces
+
+# ArgoCD-Anwendungen
+kubectl --kubeconfig=terraform/kubeconfig -n argocd get applications
+
+# Example App Status
 kubectl --kubeconfig=terraform/kubeconfig get pods -n example-app
 ```
 
-## Project Structure
+### Logs anzeigen
+```bash
+# Example App Logs
+kubectl --kubeconfig=terraform/kubeconfig logs -n example-app deployment/example-frontend
 
-The project includes the following components:
+# ArgoCD-Logs
+kubectl --kubeconfig=terraform/kubeconfig logs -n argocd deployment/argocd-server
+```
+
+## 🔧 Skalierung
+
+### Horizontale Skalierung (Pods)
+```yaml
+# In kubernetes/*/deployment.yaml
+spec:
+  replicas: 3  # Anzahl Pods erhöhen
+```
+
+### Vertikale Skalierung (Nodes)
+```hcl
+# In terraform/main.tf
+resource "exoscale_sks_nodepool" "my_sks_nodepool" {
+  instance_type = "standard.large"  # Größere Instanzen
+  size          = 3                 # Mehr Nodes
+}
+```
+
+## 🛠️ Troubleshooting
+
+### Häufige Probleme
+
+**1. Pods starten nicht:**
+```bash
+kubectl --kubeconfig=terraform/kubeconfig describe pods -n <namespace>
+```
+
+**2. ArgoCD-Sync-Fehler:**
+```bash
+kubectl --kubeconfig=terraform/kubeconfig -n argocd describe applications
+```
+
+**3. Service nicht erreichbar:**
+```bash
+# Node-IP prüfen
+kubectl --kubeconfig=terraform/kubeconfig get nodes -o wide
+
+# Service-Status prüfen
+kubectl --kubeconfig=terraform/kubeconfig get svc --all-namespaces
+```
+
+## 🔒 Sicherheit
+
+- ✅ GitHub Secrets für sensible Daten
+- ✅ Automatische Updates über ArgoCD
+- ⚠️ Standard-Passwörter in Produktion ändern
+- ⚠️ Security Groups vor Produktionseinsatz überprüfen
+
+## 🧪 Testen der GitOps-Pipeline
+
+### Test 1: Anwendung aktualisieren
+```bash
+# Ändern Sie z.B. die Replicas in kubernetes/example-app/deployment.yaml
+# Committen und pushen Sie die Änderung
+# ArgoCD synchronisiert automatisch
+```
+
+### Test 2: Rollback
+```bash
+# Über ArgoCD UI oder kubectl
+kubectl --kubeconfig=terraform/kubeconfig -n argocd app rollback example-app
+```
+
+### Test 3: Status überwachen
+```bash
+# ArgoCD Sync Status prüfen
+kubectl --kubeconfig=terraform/kubeconfig -n argocd get applications example-app -o yaml
+```
+
+## 📁 Projektstruktur
 
 ```
 opentofu/
-├── .github/
-│   └── workflows/
-│       └── deploy.yml                # GitHub Actions Workflow
+├── .github/workflows/
+│   └── deploy.yml              # GitHub Actions Pipeline
 ├── kubernetes/
-│   ├── movie-app/                   # Movie Library Application
-│   │   ├── frontend/               # React Frontend
-│   │   ├── backend/                # Node.js Backend
-│   │   ├── frontend-deployment.yaml
-│   │   ├── backend-deployment.yaml
-│   │   └── postgres-deployment.yaml
-│   ├── keycloak/                    # Keycloak Configuration
-│   │   ├── namespace.yaml
-│   │   ├── deployment.yaml
-│   │   └── service.yaml
-│   └── example-app/                 # Example Application
-├── terraform/                       # OpenTofu/Terraform Configurations
-│   ├── argocd.tf                   # ArgoCD Installation
-│   ├── main.tf                     # Exoscale Cluster
-│   ├── variables.tf                # Variables Definition
-│   ├── provider.tf                 # Provider Configuration
-│   └── terraform.tfvars            # Variables Values
-├── build-images.sh                  # Script to build Docker images
-├── keycloak-setup.sh               # Script to configure Keycloak
-└── README.md
+│   └── example-app/           # Nginx Frontend + Node.js Backend Demo
+│       ├── deployment.yaml    # Deployment Konfiguration
+│       ├── service.yaml       # Service Konfiguration
+│       └── namespace.yaml     # Namespace Definition
+├── terraform/
+│   ├── main.tf               # Exoscale Cluster
+│   ├── argocd.tf            # ArgoCD Installation
+│   ├── app-values.yaml      # ArgoCD App Template
+│   └── variables.tf         # Variablen
+└── README.md                 # Diese Dokumentation
 ```
 
-## Prerequisites
+## 🚀 Nächste Schritte
 
-1. GitHub Account
-2. Exoscale Account with API credentials
-3. OpenTofu/Terraform CLI (Version 1.5.0 or higher)
-4. kubectl
-5. Git
-6. Docker (for building application images)
-7. jq (for Keycloak setup script)
+1. **Monitoring hinzufügen**: Prometheus + Grafana
+2. **Backup-Strategie**: Velero für Cluster-Backups
+3. **CI/CD erweitern**: Automatische Tests vor Deployment
+4. **Weitere Anwendungen**: Hinzufügen zusätzlicher Beispiel-Apps
 
-## Setup Instructions
+## 📞 Support
 
-### 1. Repository Setup
+Bei Fragen oder Problemen:
+1. Überprüfen Sie die GitHub Actions Logs
+2. Prüfen Sie ArgoCD UI für Sync-Status
+3. Verwenden Sie kubectl für detaillierte Diagnose
+4. Erstellen Sie ein Issue im Repository
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/bug-sult/opentofu.git
-   cd opentofu
-   ```
+## 📄 Lizenz
 
-### 2. Build Application Images
+Dieses Projekt steht unter der MIT-Lizenz - siehe LICENSE-Datei für Details.
 
-1. Make the build script executable:
-   ```bash
-   chmod +x build-images.sh
-   ```
+---
 
-2. Run the build script:
-   ```bash
-   ./build-images.sh
-   ```
-
-### 3. Deploy Infrastructure and Applications
-
-1. Configure Exoscale:
-
-1. Log into your Exoscale account
-2. Navigate to IAM → API Keys
-3. Create a new API Key
-4. Note down:
-   - API Key
-   - API Secret
-
-2. Configure GitHub Secrets:
-
-1. Go to your GitHub repository
-2. Navigate to Settings → Secrets and variables → Actions
-3. Add the following secrets:
-   - `EXOSCALE_API_KEY`: Your Exoscale API Key
-   - `EXOSCALE_API_SECRET`: Your Exoscale API Secret
-
-3. Configure Local Environment:
-
-1. Create terraform.tfvars in the terraform directory:
-   ```bash
-   cd terraform
-   ```
-
-2. Create a file named `terraform.tfvars` with the following content:
-   ```hcl
-   exoscale_key    = "your-api-key"
-   exoscale_secret = "your-api-secret"
-   cluster_name    = "my-cluster"
-   ```
-
-4. Deploy Infrastructure:
-
-The deployment process is automated through GitHub Actions:
-
-1. Push your changes to the main branch:
-   ```bash
-   git add .
-   git commit -m "Update configuration"
-   git push origin main
-   ```
-
-2. The workflow will:
-   - Initialize OpenTofu
-   - Create the Exoscale Kubernetes cluster
-   - Install ArgoCD
-   - Deploy the example application
-
-### 4. Configure Keycloak
-
-1. Make the Keycloak setup script executable:
-   ```bash
-   chmod +x keycloak-setup.sh
-   ```
-
-2. Wait for Keycloak to be ready (check pod status):
-   ```bash
-   kubectl --kubeconfig=terraform/kubeconfig get pods -n keycloak
-   ```
-
-3. Run the Keycloak setup script:
-   ```bash
-   ./keycloak-setup.sh
-   ```
-
-### 5. Access Your Applications
-
-1. Get the node IP:
-   ```bash
-   kubectl --kubeconfig=terraform/kubeconfig get nodes -o wide
-   ```
-
-2. Access the applications:
-   - Movie Library: http://<node-ip>:30083
-   - Keycloak: http://<node-ip>:30082
-   - ArgoCD: https://<node-ip>:30081
-
-3. Login to the Movie Library:
-   - Username: testuser
-   - Password: test123
-
-#### Accessing ArgoCD UI
-
-1. Get the kubeconfig:
-   ```bash
-   # If using GitHub Actions, the kubeconfig will be in terraform/kubeconfig
-   ```
-
-2. Port forward ArgoCD service:
-   ```bash
-   kubectl --kubeconfig=terraform/kubeconfig port-forward svc/argocd-server -n argocd 8080:443
-   ```
-
-3. Access ArgoCD:
-   - URL: https://localhost:8080
-   - Username: admin
-   - Password: Get it by running:
-     ```bash
-     kubectl --kubeconfig=terraform/kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-     ```
-
-#### Accessing Example Application
-
-1. Get node IP:
-   ```bash
-   kubectl --kubeconfig=terraform/kubeconfig get nodes -o wide
-   ```
-
-2. Access the application:
-   - URL: http://<node-ip>:30080
-   - The example nginx application is exposed on port 30080
-
-## Monitoring and Troubleshooting
-
-### Check Application Status
-
-```bash
-# Check all applications
-kubectl --kubeconfig=terraform/kubeconfig get pods --all-namespaces
-
-# Check Movie Library components
-kubectl --kubeconfig=terraform/kubeconfig get pods -n movie-app
-
-# Check Keycloak
-kubectl --kubeconfig=terraform/kubeconfig get pods -n keycloak
-
-# Check ArgoCD application status
-kubectl --kubeconfig=terraform/kubeconfig get applications -n argocd
-
-# Check logs for Movie Library backend
-kubectl --kubeconfig=terraform/kubeconfig logs -n movie-app deployment/movie-backend
-
-# Check logs for Movie Library frontend
-kubectl --kubeconfig=terraform/kubeconfig logs -n movie-app deployment/movie-frontend
-
-# Check logs for Keycloak
-kubectl --kubeconfig=terraform/kubeconfig logs -n keycloak deployment/keycloak
-```
-
-### Common Issues and Solutions
-
-1. If ArgoCD sync fails:
-   ```bash
-   kubectl --kubeconfig=terraform/kubeconfig -n argocd get applications
-   kubectl --kubeconfig=terraform/kubeconfig -n argocd describe applications example-app
-   ```
-
-2. If pods are not running:
-   ```bash
-   kubectl --kubeconfig=terraform/kubeconfig -n example-app describe pods
-   ```
-
-## Infrastructure Management
-
-### Scaling the Application
-
-1. Horizontal Scaling (number of pods):
-   Edit `kubernetes/example-app/deployment.yaml`:
-   ```yaml
-   spec:
-     replicas: 2  # Modify this number
-   ```
-
-2. Vertical Scaling (node size):
-   Edit `terraform/main.tf`:
-   ```hcl
-   resource "exoscale_sks_nodepool" "my_sks_nodepool" {
-     instance_type = "standard.medium"  # Modify instance type
-     size          = 1                 # Modify number of nodes
-   }
-   ```
-
-### Updating Applications
-
-1. ArgoCD automatically syncs changes from the repository
-2. To manually trigger sync:
-   ```bash
-   kubectl --kubeconfig=terraform/kubeconfig -n argocd get applications
-   kubectl --kubeconfig=terraform/kubeconfig -n argocd app sync example-app
-   ```
-
-## Security Best Practices
-
-1. Never commit sensitive information (API keys, secrets) to the repository
-2. Use GitHub Secrets for sensitive values
-3. Regularly update ArgoCD and other components
-4. Review Security Group rules in terraform/main.tf
-
-## Cleanup
-
-To destroy the infrastructure:
-
-```bash
-cd terraform
-terraform destroy -var="exoscale_key=your-key" -var="exoscale_secret=your-secret"
-```
-
-Note: This will destroy all resources including the Kubernetes cluster and all applications.
+**Hinweis**: Das angegebene Repository `https://github.com/schdandan/AKT-G-5.git` war nicht verfügbar. Die aktuelle Konfiguration verwendet bewährte Beispielanwendungen zur Demonstration der GitOps-Pipeline.

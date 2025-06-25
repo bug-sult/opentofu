@@ -18,16 +18,6 @@ locals {
       name      = "example-app"
       path      = "kubernetes/example-app"
       namespace = "example-app"
-    },
-    {
-      name      = "keycloak"
-      path      = "kubernetes/keycloak"
-      namespace = "keycloak"
-    },
-    {
-      name      = "movie-app"
-      path      = "kubernetes/movie-app"
-      namespace = "movie-app"
     }
   ]
 }
