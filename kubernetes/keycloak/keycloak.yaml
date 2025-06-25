@@ -7,20 +7,17 @@ spec:
   instances: 1
   db:
     vendor: h2
-  http:
-    httpEnabled: true
-  hostname:
-    hostname: keycloak.local
-    strict: false
-    strictBackchannel: false
-  proxy:
-    headers: xforwarded
+  hostname: keycloak.local
   additionalOptions:
+    - name: http-enabled
+      value: "true"
     - name: http-port
       value: "8080"
-    - name: hostname-strict-https
-      value: "false"
+    - name: proxy
+      value: edge
     - name: hostname-strict
+      value: "false"
+    - name: hostname-strict-https
       value: "false"
     - name: log-level
       value: INFO
