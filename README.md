@@ -8,6 +8,7 @@ Vollständig automatisierte Infrastruktur mit OpenTofu (Terraform), Kubernetes u
 - **GitOps-Deployment** mit ArgoCD
 - **Kontinuierliche Synchronisation** über GitHub Actions
 - **Beispielanwendung** zur Demonstration
+- **Keycloak Integration** über Operator (Version 26.0.7)
 
 ## 📋 Anwendungen
 
@@ -15,6 +16,7 @@ Vollständig automatisierte Infrastruktur mit OpenTofu (Terraform), Kubernetes u
 |-----------|--------------|------|
 | **Example App** | Nginx Frontend + Node.js Backend Demo | 30080 |
 | **ArgoCD** | GitOps-Management-Interface | 30081 |
+| **Keycloak** | Identity und Access Management | 30082 |
 
 ## ⚡ Schnellstart
 
@@ -44,8 +46,9 @@ git push origin main
 **Das passiert automatisch:**
 1. ✅ Kubernetes-Cluster wird auf Exoscale erstellt
 2. ✅ ArgoCD wird installiert und konfiguriert
-3. ✅ Example App wird automatisch bereitgestellt
-4. ✅ URLs werden in den GitHub Actions Logs angezeigt
+3. ✅ Keycloak Operator wird bereitgestellt (Version 26.0.7)
+4. ✅ Example App wird automatisch bereitgestellt
+5. ✅ URLs werden in den GitHub Actions Logs angezeigt
 
 ### 4. Zugriff auf Anwendungen
 
@@ -55,6 +58,7 @@ Nach der Bereitstellung finden Sie die URLs in den GitHub Actions Logs:
 Application URLs:
 ArgoCD UI: https://<node-ip>:30081
 Example App: http://<node-ip>:30080
+Keycloak: http://<node-ip>:30082
 ```
 
 ## 🔐 Standard-Anmeldedaten
@@ -62,6 +66,7 @@ Example App: http://<node-ip>:30080
 | Service | Benutzername | Passwort | Hinweise |
 |---------|--------------|----------|----------|
 | ArgoCD | admin | Siehe Befehl* | *Siehe unten |
+| Keycloak | admin | admin | Standard-Anmeldedaten |
 
 *ArgoCD-Passwort abrufen:
 ```bash
@@ -218,13 +223,19 @@ opentofu/
 ├── .github/workflows/
 │   └── deploy.yml              # GitHub Actions Pipeline
 ├── kubernetes/
-│   └── example-app/           # Nginx Frontend + Node.js Backend Demo
-│       ├── deployment.yaml    # Deployment Konfiguration
-│       ├── service.yaml       # Service Konfiguration
+│   ├── example-app/           # Nginx Frontend + Node.js Backend Demo
+│   │   ├── deployment.yaml    # Deployment Konfiguration
+│   │   ├── service.yaml       # Service Konfiguration
+│   │   └── namespace.yaml     # Namespace Definition
+│   └── keycloak/             # Keycloak Identity Management
+│       ├── operator.yaml      # Keycloak Operator (v26.0.7)
+│       ├── keycloak.yaml      # Keycloak Instanz
+│       ├── crds.yaml          # Custom Resource Definitions
+│       ├── realm.yaml         # Realm Konfiguration
 │       └── namespace.yaml     # Namespace Definition
 ├── terraform/
 │   ├── main.tf               # Exoscale Cluster
-│   ├── argocd.tf            # ArgoCD Installation
+│   ├── argocd.tf            # ArgoCD Installation + App Config
 │   ├── app-values.yaml      # ArgoCD App Template
 │   └── variables.tf         # Variablen
 └── README.md                 # Diese Dokumentation

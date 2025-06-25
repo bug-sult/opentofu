@@ -102,7 +102,7 @@ spec:
       serviceAccountName: keycloak-operator
       containers:
         - name: operator
-          image: quay.io/keycloak/keycloak-operator:25.0.6
+          image: quay.io/keycloak/keycloak-operator:26.0.7
           imagePullPolicy: Always
           env:
             - name: WATCH_NAMESPACE
