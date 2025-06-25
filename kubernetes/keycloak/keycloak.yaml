@@ -17,8 +17,8 @@ spec:
   ingress:
     enabled: false
   features:
-    infinispan:
-      embedded: true
+    enabled:
+      - infinispan
   proxy:
     enabled: true
     reencrypt: false
