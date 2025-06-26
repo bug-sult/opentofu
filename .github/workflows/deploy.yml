@@ -55,12 +55,16 @@ jobs:
         echo "ArgoCD Admin Password:"
         kubectl --kubeconfig=./kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 
-    - name: Sync ArgoCD Applications
+    - name: Force Sync ArgoCD Applications
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       run: |
         cd terraform
-        echo "Syncing ArgoCD applications..."
-        kubectl --kubeconfig=./kubeconfig -n argocd get applications
+        echo "Force syncing ArgoCD applications..."
+        kubectl --kubeconfig=./kubeconfig -n argocd get applications -o name | while read app; do
+          echo "Syncing $app..."
+          kubectl --kubeconfig=./kubeconfig -n argocd patch $app -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' --type=merge
+          kubectl --kubeconfig=./kubeconfig -n argocd patch $app -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' --type=merge
+        done
         
     - name: Get Node IP and Service URLs
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -73,6 +77,7 @@ jobs:
         echo "Application URLs:"
         echo "ArgoCD UI: https://$NODE_IP:30081"
         echo "Example App: http://$NODE_IP:30080"
+        echo "Keycloak: http://$NODE_IP:30083"
         echo ""
         echo "ArgoCD Login:"
         echo "Username: admin"
