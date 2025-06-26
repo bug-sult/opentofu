@@ -67,6 +67,41 @@ jobs:
         echo "ArgoCD Admin Password:"
         kubectl --kubeconfig=./kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 
+    - name: Create ArgoCD Applications if missing
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
+      run: |
+        cd terraform
+        echo "Checking and creating ArgoCD applications..."
+        
+        # Create gruppe5-gute application if it doesn't exist
+        if ! kubectl --kubeconfig=./kubeconfig -n argocd get application gruppe5-gute >/dev/null 2>&1; then
+          echo "Creating gruppe5-gute application..."
+          cat <<EOF | kubectl --kubeconfig=./kubeconfig apply -f -
+        apiVersion: argoproj.io/v1alpha1
+        kind: Application
+        metadata:
+          name: gruppe5-gute
+          namespace: argocd
+        spec:
+          project: default
+          source:
+            repoURL: https://github.com/bug-sult/opentofu.git
+            targetRevision: HEAD
+            path: kubernetes/gruppe5-gute
+          destination:
+            server: https://kubernetes.default.svc
+            namespace: gruppe5-gute
+          syncPolicy:
+            automated:
+              prune: true
+              selfHeal: true
+            syncOptions:
+            - CreateNamespace=true
+        EOF
+        else
+          echo "gruppe5-gute application already exists"
+        fi
+
     - name: Force Sync ArgoCD Applications
       if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
       run: |
