@@ -42,41 +42,55 @@ jobs:
         cd terraform
         terraform apply -auto-approve -var="exoscale_key=${{ secrets.EXOSCALE_API_KEY }}" -var="exoscale_secret=${{ secrets.EXOSCALE_API_SECRET }}" || echo "Terraform apply failed, continuing with existing cluster..."
 
-    - name: Check if kubeconfig exists
+    - name: Check if kubeconfig exists or use existing cluster
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       run: |
         if [ -f terraform/kubeconfig ]; then
-          echo "Kubeconfig found, proceeding with ArgoCD operations"
+          echo "Terraform kubeconfig found, using it"
           echo "KUBECONFIG_EXISTS=true" >> $GITHUB_ENV
+          echo "KUBECONFIG_PATH=terraform/kubeconfig" >> $GITHUB_ENV
+        elif kubectl cluster-info >/dev/null 2>&1; then
+          echo "Existing kubectl context found, using it"
+          echo "KUBECONFIG_EXISTS=true" >> $GITHUB_ENV
+          echo "KUBECONFIG_PATH=" >> $GITHUB_ENV
         else
-          echo "Kubeconfig not found, skipping ArgoCD operations"
+          echo "No kubeconfig found, skipping ArgoCD operations"
           echo "KUBECONFIG_EXISTS=false" >> $GITHUB_ENV
         fi
 
     - name: Wait for ArgoCD
       if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
       run: |
-        cd terraform
-        kubectl --kubeconfig=./kubeconfig wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
-        kubectl --kubeconfig=./kubeconfig wait --for=condition=available --timeout=600s deployment/argocd-application-controller -n argocd
+        KUBECTL_CMD="kubectl"
+        if [ -n "${{ env.KUBECONFIG_PATH }}" ]; then
+          KUBECTL_CMD="kubectl --kubeconfig=${{ env.KUBECONFIG_PATH }}"
+        fi
+        $KUBECTL_CMD wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
+        $KUBECTL_CMD wait --for=condition=available --timeout=600s deployment/argocd-application-controller -n argocd
 
     - name: Get ArgoCD Admin Password
       if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
       run: |
-        cd terraform
+        KUBECTL_CMD="kubectl"
+        if [ -n "${{ env.KUBECONFIG_PATH }}" ]; then
+          KUBECTL_CMD="kubectl --kubeconfig=${{ env.KUBECONFIG_PATH }}"
+        fi
         echo "ArgoCD Admin Password:"
-        kubectl --kubeconfig=./kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+        $KUBECTL_CMD -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 
     - name: Create ArgoCD Applications if missing
       if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
       run: |
-        cd terraform
+        KUBECTL_CMD="kubectl"
+        if [ -n "${{ env.KUBECONFIG_PATH }}" ]; then
+          KUBECTL_CMD="kubectl --kubeconfig=${{ env.KUBECONFIG_PATH }}"
+        fi
         echo "Checking and creating ArgoCD applications..."
         
         # Create gruppe5-gute application if it doesn't exist
-        if ! kubectl --kubeconfig=./kubeconfig -n argocd get application gruppe5-gute >/dev/null 2>&1; then
+        if ! $KUBECTL_CMD -n argocd get application gruppe5-gute >/dev/null 2>&1; then
           echo "Creating gruppe5-gute application..."
-          cat <<EOF | kubectl --kubeconfig=./kubeconfig apply -f -
+          cat <<EOF | $KUBECTL_CMD apply -f -
         apiVersion: argoproj.io/v1alpha1
         kind: Application
         metadata:
@@ -105,20 +119,26 @@ jobs:
     - name: Force Sync ArgoCD Applications
       if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
       run: |
-        cd terraform
+        KUBECTL_CMD="kubectl"
+        if [ -n "${{ env.KUBECONFIG_PATH }}" ]; then
+          KUBECTL_CMD="kubectl --kubeconfig=${{ env.KUBECONFIG_PATH }}"
+        fi
         echo "Force syncing ArgoCD applications..."
-        kubectl --kubeconfig=./kubeconfig -n argocd get applications -o name | while read app; do
+        $KUBECTL_CMD -n argocd get applications -o name | while read app; do
           echo "Syncing $app..."
-          kubectl --kubeconfig=./kubeconfig -n argocd patch $app -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' --type=merge
-          kubectl --kubeconfig=./kubeconfig -n argocd patch $app -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' --type=merge
+          $KUBECTL_CMD -n argocd patch $app -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' --type=merge
+          $KUBECTL_CMD -n argocd patch $app -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' --type=merge
         done
         
     - name: Get Node IP and Service URLs
       if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
       run: |
-        cd terraform
+        KUBECTL_CMD="kubectl"
+        if [ -n "${{ env.KUBECONFIG_PATH }}" ]; then
+          KUBECTL_CMD="kubectl --kubeconfig=${{ env.KUBECONFIG_PATH }}"
+        fi
         echo "Getting node IP..."
-        NODE_IP=$(kubectl --kubeconfig=./kubeconfig get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
+        NODE_IP=$($KUBECTL_CMD get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
         echo "Node IP: $NODE_IP"
         echo ""
         echo "Application URLs:"
