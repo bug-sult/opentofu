@@ -19,6 +19,7 @@ Vollständig automatisierte Infrastruktur mit OpenTofu (Terraform), Kubernetes u
 | **Example App Backend** | Node.js Express API | 30081 | ✅ Online |
 | **ArgoCD** | GitOps-Management-Interface | 30082 | ✅ Verfügbar |
 | **Keycloak** | Identity und Access Management | 30083 | ✅ Verfügbar |
+| **Gruppe5-Gute** | Custom Frontend mit Meme | 30084 | 🚀 Deploying |
 
 ## ⚡ Cluster Information
 
@@ -34,6 +35,7 @@ Vollständig automatisierte Infrastruktur mit OpenTofu (Terraform), Kubernetes u
 - Backend API: http://138.124.209.86:30081
 - ArgoCD: http://138.124.209.86:30082
 - Keycloak: http://138.124.209.86:30083
+- Gruppe5-Gute: http://138.124.209.86:30084
 
 ## ⚡ Schnellstart
 
