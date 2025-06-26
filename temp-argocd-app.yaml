@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gruppe5-gute
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/bug-sult/opentofu.git
+    targetRevision: HEAD
+    path: kubernetes/gruppe5-gute
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gruppe5-gute
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
