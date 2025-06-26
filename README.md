@@ -19,7 +19,7 @@ Vollständig automatisierte Infrastruktur mit OpenTofu (Terraform), Kubernetes u
 | **Example App Backend** | Node.js Express API | 30081 | ✅ Online |
 | **ArgoCD** | GitOps-Management-Interface | 30082 | ✅ Verfügbar |
 | **Keycloak** | Identity und Access Management | 30083 | ✅ Verfügbar |
-| **Gruppe5-Gute** | Custom Frontend mit Meme | 30084 | 🚀 Deploying |
+| **Gruppe5-Gute** | Custom Frontend mit Meme | 30084 | ⚡ Testing Workflow |
 
 ## ⚡ Cluster Information
 
