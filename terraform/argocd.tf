@@ -24,6 +24,11 @@ locals {
       name      = "keycloak"
       path      = "kubernetes/keycloak"
       namespace = "keycloak"
+    },
+    {
+      name      = "gruppe5-gute"
+      path      = "kubernetes/gruppe5-gute"
+      namespace = "gruppe5-gute"
     }
   ]
 }

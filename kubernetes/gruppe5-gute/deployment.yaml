@@ -1,0 +1,222 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gruppe5-gute
+  namespace: gruppe5-gute
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gruppe5-gute
+  template:
+    metadata:
+      labels:
+        app: gruppe5-gute
+    spec:
+      containers:
+      - name: gruppe5-gute
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: html-content
+          mountPath: /usr/share/nginx/html
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "100m"
+          limits:
+            memory: "64Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: html-content
+        configMap:
+          name: gruppe5-gute-content
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gruppe5-gute-content
+  namespace: gruppe5-gute
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Gruppe 5 - Gute App</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            .container {
+                background: white;
+                padding: 3rem;
+                border-radius: 20px;
+                box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+                text-align: center;
+                max-width: 700px;
+                width: 100%;
+                animation: fadeIn 1s ease-in;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(30px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            h1 {
+                color: #333;
+                margin-bottom: 1rem;
+                font-size: 2.5rem;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            }
+            .subtitle {
+                color: #666;
+                margin-bottom: 2rem;
+                font-size: 1.2rem;
+            }
+            .feature-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1.5rem;
+                margin: 2rem 0;
+            }
+            .feature-card {
+                background: #f8f9fa;
+                padding: 1.5rem;
+                border-radius: 15px;
+                border: 2px solid #e9ecef;
+                transition: transform 0.3s, box-shadow 0.3s;
+            }
+            .feature-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            }
+            .feature-icon {
+                font-size: 2rem;
+                margin-bottom: 1rem;
+            }
+            .status-section {
+                background: #e8f5e8;
+                border: 2px solid #4caf50;
+                padding: 1.5rem;
+                border-radius: 15px;
+                margin: 2rem 0;
+            }
+            .status-online {
+                color: #2e7d32;
+                font-weight: bold;
+                font-size: 1.1rem;
+            }
+            .info-section {
+                background: #f0f8ff;
+                border: 2px solid #2196f3;
+                padding: 1.5rem;
+                border-radius: 15px;
+                margin: 2rem 0;
+            }
+            .team-info {
+                display: flex;
+                justify-content: space-around;
+                flex-wrap: wrap;
+                gap: 1rem;
+                margin-top: 1rem;
+            }
+            .team-member {
+                background: white;
+                padding: 1rem;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                min-width: 150px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div style="margin-bottom: 2rem;">
+                <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjQ4IiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iNCIgZmlsbD0iI2Y5ZjlmOSIvPgo8ZWxsaXBzZSBjeD0iMzUiIGN5PSIzNSIgcng9IjgiIHJ5PSI2IiBmaWxsPSIjMzMzIi8+CjxlbGxpcHNlIGN4PSI2NSIgY3k9IjM1IiByeD0iOCIgcnk9IjYiIGZpbGw9IiMzMzMiLz4KPHBhdGggZD0iTTMwIDQ1IFE1MCA1NSA3MCA0NSIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjMiIGZpbGw9Im5vbmUiLz4KPHBhdGggZD0iTTM1IDY1IFE1MCA3NSA2NSA2NSIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjMiIGZpbGw9Im5vbmUiLz4KPC9zdmc+" 
+                     alt="Gruppe 5 Gesicht" 
+                     style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid #667eea; margin-bottom: 1rem;">
+            </div>
+            <h1>🚀 Gruppe 5 - Gute App</h1>
+            <p class="subtitle">Erfolgreich deployed mit GitOps & ArgoCD</p>
+            
+            <div class="status-section">
+                <div class="status-online">✅ Anwendung ist online und funktionsfähig!</div>
+                <p>Deployment erfolgreich über GitHub Actions und ArgoCD</p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <h3>GitOps</h3>
+                    <p>Automatische Synchronisation über ArgoCD</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">☸️</div>
+                    <h3>Kubernetes</h3>
+                    <p>Container-orchestrierung auf Exoscale</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <h3>CI/CD</h3>
+                    <p>GitHub Actions Pipeline</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Sicherheit</h3>
+                    <p>Sichere Deployment-Pipeline</p>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3>📊 Technische Details</h3>
+                <p><strong>Namespace:</strong> gruppe5-gute</p>
+                <p><strong>Container:</strong> nginx:alpine</p>
+                <p><strong>Port:</strong> 30084</p>
+                <p><strong>Cluster:</strong> Exoscale SKS (Wien)</p>
+                <p><strong>Deployment-Zeit:</strong> <span id="timestamp"></span></p>
+            </div>
+
+            <div class="info-section">
+                <h3>👥 Team Information</h3>
+                <div class="team-member">
+                    <h4>Gruppe 5</h4>
+                    <p>Erfolgreiche GitOps-Implementation</p>
+                    <p>🎯 Mission: Automatisierte Deployments</p>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Aktuelle Zeit anzeigen
+            document.getElementById('timestamp').textContent = new Date().toLocaleString('de-DE');
+            
+            // Einfache Animation für Feature-Cards
+            const cards = document.querySelectorAll('.feature-card');
+            cards.forEach((card, index) => {
+                card.style.animationDelay = `${index * 0.1}s`;
+                card.style.animation = 'fadeIn 0.6s ease-in forwards';
+            });
+        </script>
+    </body>
+    </html>

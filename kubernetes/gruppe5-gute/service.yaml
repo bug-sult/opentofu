@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gruppe5-gute-service
+  namespace: gruppe5-gute
+spec:
+  selector:
+    app: gruppe5-gute
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 30084
+  type: NodePort
