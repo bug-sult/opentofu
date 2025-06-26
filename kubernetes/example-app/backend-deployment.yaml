@@ -15,28 +15,38 @@ spec:
     spec:
       containers:
       - name: example-backend
-        image: nginx:alpine
+        image: node:18-alpine
+        workingDir: /app
+        command: ["sh", "-c"]
+        args: ["ls -la /config && cp /config/package.json /app/ && cp /config/server.js /app/ && ls -la /app && npm install && npm start"]
         ports:
-        - containerPort: 80
+        - containerPort: 3001
+        volumeMounts:
+        - name: app-files
+          mountPath: /config
         resources:
           requests:
-            memory: "64Mi"
+            memory: "128Mi"
             cpu: "100m"
           limits:
-            memory: "128Mi"
+            memory: "256Mi"
             cpu: "200m"
         livenessProbe:
           httpGet:
-            path: /
-            port: 80
-          initialDelaySeconds: 10
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /
-            port: 80
-          initialDelaySeconds: 5
+            path: /health
+            port: 3001
+          initialDelaySeconds: 20
           periodSeconds: 5
+      volumes:
+      - name: app-files
+        configMap:
+          name: example-backend-app
 ---
 apiVersion: v1
 kind: Service
@@ -49,5 +59,5 @@ spec:
   ports:
     - protocol: TCP
       port: 3001
-      targetPort: 80
+      targetPort: 3001
   type: ClusterIP

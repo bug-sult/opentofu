@@ -1,3 +1,4 @@
+
 # OpenTofu GitOps Infrastructure
 
 Vollständig automatisierte Infrastruktur mit OpenTofu (Terraform), Kubernetes und GitOps über ArgoCD. Diese Lösung demonstriert eine produktionsreife Infrastruktur mit automatischer Bereitstellung und Synchronisation.
@@ -12,11 +13,27 @@ Vollständig automatisierte Infrastruktur mit OpenTofu (Terraform), Kubernetes u
 
 ## 📋 Anwendungen
 
-| Anwendung | Beschreibung | Port |
-|-----------|--------------|------|
-| **Example App** | Nginx Frontend + Node.js Backend Demo | 30080 |
-| **ArgoCD** | GitOps-Management-Interface | 30081 |
-| **Keycloak** | Identity und Access Management | 30082 |
+| Anwendung | Beschreibung | Port | Status |
+|-----------|--------------|------|--------|
+| **Example App Frontend** | Nginx Frontend mit API-Proxy | 30080 | ✅ Online |
+| **Example App Backend** | Node.js Express API | 30081 | ✅ Online |
+| **ArgoCD** | GitOps-Management-Interface | 30082 | ✅ Verfügbar |
+| **Keycloak** | Identity und Access Management | 30083 | ✅ Verfügbar |
+
+## ⚡ Cluster Information
+
+**Aktueller Cluster:**
+- **Name/ID:** 5bb7bd96-e2ca-4e24-85f2-4bb34eae6ee0
+- **Provider:** Exoscale SKS
+- **Region:** sks-at-vie-2 (Wien, Österreich)
+- **Endpoint:** https://5bb7bd96-e2ca-4e24-85f2-4bb34eae6ee0.sks-at-vie-2.exo.io:443
+- **Context:** kubernetes-admin
+
+**Anwendungs-URLs:**
+- Frontend: http://138.124.209.86:30080
+- Backend API: http://138.124.209.86:30081
+- ArgoCD: http://138.124.209.86:30082
+- Keycloak: http://138.124.209.86:30083
 
 ## ⚡ Schnellstart
 

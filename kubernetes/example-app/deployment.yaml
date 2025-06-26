@@ -21,6 +21,8 @@ spec:
         volumeMounts:
         - name: html-content
           mountPath: /usr/share/nginx/html
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
         resources:
           requests:
             memory: "32Mi"
@@ -32,6 +34,15 @@ spec:
       - name: html-content
         configMap:
           name: example-frontend-content
+          items:
+          - key: index.html
+            path: index.html
+      - name: nginx-config
+        configMap:
+          name: example-frontend-content
+          items:
+          - key: nginx.conf
+            path: default.conf
 ---
 apiVersion: v1
 kind: ConfigMap
