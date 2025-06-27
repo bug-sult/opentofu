@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-app-3-service
-  namespace: test-app-3
+  name: testing-testapp-service
+  namespace: testing-testapp
 spec:
   selector:
-    app: test-app-3-frontend
+    app: testing-testapp-frontend
   ports:
     - protocol: TCP
       port: 80
       targetPort: 80
-      nodePort: 30089
+      nodePort: 30090
   type: NodePort

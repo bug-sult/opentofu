@@ -76,6 +76,27 @@ jobs:
           kubectl --dry-run=client apply -f "$APP_PATH/deployment.yaml"
           kubectl --dry-run=client apply -f "$APP_PATH/service.yaml"
 
+          if [ -f "$APP_PATH/argocd-application.yaml" ]; then
+            echo "✅ Found ArgoCD Application manifest"
+            kubectl --dry-run=client apply -f "$APP_PATH/argocd-application.yaml"
+          else
+            echo "❌ Missing ArgoCD Application manifest"
+            exit 1
+          fi
+
+      - name: Create ArgoCD Application
+        run: |
+          APP_PATH="kubernetes/${{ matrix.app }}"
+          echo "🔄 Creating/Updating ArgoCD Application first"
+          
+          # Ensure argocd namespace exists
+          kubectl get namespace argocd || kubectl create namespace argocd
+          
+          # Apply ArgoCD Application
+          kubectl apply -f "$APP_PATH/argocd-application.yaml"
+          
+          echo "✅ ArgoCD Application created/updated"
+
       - name: Deploy to Kubernetes
         run: |
           APP_PATH="kubernetes/${{ matrix.app }}"
@@ -103,9 +124,62 @@ jobs:
           fi
           echo "✅ All pods running successfully"
 
-      - name: Apply ArgoCD Application (optional)
-        if: ${{ hashFiles(format('kubernetes/{0}/argocd-application.yaml', matrix.app)) != '' }}
+      - name: Verify ArgoCD Application
         run: |
-          echo "🔄 Applying ArgoCD Application"
-          kubectl apply -f "kubernetes/${{ matrix.app }}/argocd-application.yaml"
+          echo "🔍 Verifying ArgoCD Application status"
+          
+          # Wait for ArgoCD Application to be created
+          for i in {1..30}; do
+            if kubectl get application ${{ matrix.app }} -n argocd; then
+              echo "✅ ArgoCD Application found"
+              break
+            fi
+            
+            if [ $i -eq 30 ]; then
+              echo "❌ Timeout waiting for ArgoCD Application"
+              exit 1
+            fi
+            
+            echo "⏳ Waiting for ArgoCD Application to be created... (attempt $i/30)"
+            sleep 10
+          done
+          
+          # Get Application details
+          echo "📊 ArgoCD Application Status:"
+          kubectl get application ${{ matrix.app }} -n argocd -o wide
+          
+          # Check sync status
+          SYNC_STATUS=$(kubectl get application ${{ matrix.app }} -n argocd -o jsonpath='{.status.sync.status}')
+          HEALTH_STATUS=$(kubectl get application ${{ matrix.app }} -n argocd -o jsonpath='{.status.health.status}')
+          
+          echo "Sync Status: $SYNC_STATUS"
+          echo "Health Status: $HEALTH_STATUS"
+          
+          if [ "$SYNC_STATUS" != "Synced" ]; then
+            echo "❌ Application is not synced"
+            kubectl describe application ${{ matrix.app }} -n argocd
+            exit 1
+          fi
+          
+          echo "✅ ArgoCD Application is synced and healthy"
 
+      - name: Display Access Information
+        run: |
+          echo "======================================"
+          echo "🎉 Deployment Complete: ${{ matrix.app }}"
+          echo "======================================"
+          echo "📊 Resources Status:"
+          echo "-------------------"
+          echo "Pods:"
+          kubectl get pods -n ${{ matrix.app }}
+          echo ""
+          echo "Service:"
+          kubectl get svc -n ${{ matrix.app }}
+          echo ""
+          echo "ArgoCD Application:"
+          kubectl get application ${{ matrix.app }} -n argocd
+          echo "======================================"
+          echo "🔗 Access URLs:"
+          echo "ArgoCD UI: http://[NODE-IP]:30085"
+          echo "Application: Check service NodePort in ArgoCD UI"
+          echo "======================================"

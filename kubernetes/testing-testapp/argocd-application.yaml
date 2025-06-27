@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: test-app-3
+  name: testing-testapp
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -10,10 +10,10 @@ spec:
   source:
     repoURL: https://github.com/gruppe5-gute/opentofu.git
     targetRevision: HEAD
-    path: kubernetes/test-app-3
+    path: kubernetes/testing-testapp
   destination:
     server: https://kubernetes.default.svc
-    namespace: test-app-3
+    namespace: testing-testapp
   syncPolicy:
     automated:
       prune: true
