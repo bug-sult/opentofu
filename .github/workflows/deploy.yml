@@ -65,16 +65,49 @@ jobs:
           APP_PATH="kubernetes/${{ matrix.app }}"
           echo "🔍 Validating Kubernetes manifests in $APP_PATH"
 
-          for file in namespace.yaml deployment.yaml service.yaml; do
-            if [ ! -f "$APP_PATH/$file" ]; then
-              echo "❌ Missing required file: $APP_PATH/$file"
+          # Special handling for App-of-Apps pattern
+          if [ "${{ matrix.app }}" = "gruppe-5-tester" ]; then
+            echo "📦 Detected App-of-Apps pattern for gruppe-5-tester"
+            
+            # Validate app-of-apps.yaml
+            if [ ! -f "$APP_PATH/app-of-apps.yaml" ]; then
+              echo "❌ Missing app-of-apps.yaml"
               exit 1
             fi
-          done
+            kubectl --dry-run=client apply -f "$APP_PATH/app-of-apps.yaml"
+            
+            # Validate child applications
+            for child_app in "$APP_PATH/child-applications"/*.yaml; do
+              if [ -f "$child_app" ]; then
+                echo "✅ Validating child application: $(basename $child_app)"
+                kubectl --dry-run=client apply -f "$child_app"
+              fi
+            done
+            
+            # Validate individual app manifests
+            for app_dir in "$APP_PATH"/app*/; do
+              if [ -d "$app_dir" ]; then
+                echo "✅ Validating app directory: $(basename $app_dir)"
+                for file in namespace.yaml deployment.yaml service.yaml; do
+                  if [ -f "$app_dir/$file" ]; then
+                    kubectl --dry-run=client apply -f "$app_dir/$file"
+                  fi
+                done
+              fi
+            done
+          else
+            # Standard validation for regular apps
+            for file in namespace.yaml deployment.yaml service.yaml; do
+              if [ ! -f "$APP_PATH/$file" ]; then
+                echo "❌ Missing required file: $APP_PATH/$file"
+                exit 1
+              fi
+            done
 
-          kubectl --dry-run=client apply -f "$APP_PATH/namespace.yaml"
-          kubectl --dry-run=client apply -f "$APP_PATH/deployment.yaml"
-          kubectl --dry-run=client apply -f "$APP_PATH/service.yaml"
+            kubectl --dry-run=client apply -f "$APP_PATH/namespace.yaml"
+            kubectl --dry-run=client apply -f "$APP_PATH/deployment.yaml"
+            kubectl --dry-run=client apply -f "$APP_PATH/service.yaml"
+          fi
 
       - name: Create ArgoCD Application
         run: |
@@ -124,27 +157,83 @@ jobs:
           APP_PATH="kubernetes/${{ matrix.app }}"
           echo "🚀 Deploying $APP_PATH"
 
-          kubectl apply -f "$APP_PATH/namespace.yaml"
-          kubectl apply -f "$APP_PATH/deployment.yaml"
-          kubectl apply -f "$APP_PATH/service.yaml"
+          # Special handling for App-of-Apps pattern
+          if [ "${{ matrix.app }}" = "gruppe-5-tester" ]; then
+            echo "📦 Deploying App-of-Apps pattern for gruppe-5-tester"
+            
+            # Deploy individual app manifests first
+            for app_dir in "$APP_PATH"/app*/; do
+              if [ -d "$app_dir" ]; then
+                echo "🚀 Deploying $(basename $app_dir)"
+                kubectl apply -f "$app_dir/"
+              fi
+            done
+            
+            # Then deploy the app-of-apps parent application
+            kubectl apply -f "$APP_PATH/app-of-apps.yaml"
+          else
+            # Standard deployment for regular apps
+            kubectl apply -f "$APP_PATH/namespace.yaml"
+            kubectl apply -f "$APP_PATH/deployment.yaml"
+            kubectl apply -f "$APP_PATH/service.yaml"
+          fi
 
       - name: Wait for rollout
         run: |
           echo "⏳ Waiting for deployment rollout..."
-          kubectl rollout status deployment/${{ matrix.app }}-frontend -n ${{ matrix.app }} --timeout=300s
+          
+          # Special handling for App-of-Apps pattern
+          if [ "${{ matrix.app }}" = "gruppe-5-tester" ]; then
+            echo "📦 Waiting for App-of-Apps deployments"
+            
+            # Wait for app1 deployment
+            kubectl rollout status deployment/gruppe-5-tester-app1 -n gruppe-5-tester-app1 --timeout=300s
+            
+            # Wait for app2 deployment
+            kubectl rollout status deployment/gruppe-5-tester-app2 -n gruppe-5-tester-app2 --timeout=300s
+          else
+            # Standard rollout check
+            kubectl rollout status deployment/${{ matrix.app }}-frontend -n ${{ matrix.app }} --timeout=300s
+          fi
 
       - name: Post-deployment check
         run: |
-          echo "🔍 Verifying deployment in namespace '${{ matrix.app }}'"
-          kubectl get pods -n ${{ matrix.app }}
-          kubectl get svc -n ${{ matrix.app }}
+          # Special handling for App-of-Apps pattern
+          if [ "${{ matrix.app }}" = "gruppe-5-tester" ]; then
+            echo "🔍 Verifying App-of-Apps deployments"
+            
+            # Check app1
+            echo "📊 App1 Status:"
+            kubectl get pods -n gruppe-5-tester-app1
+            kubectl get svc -n gruppe-5-tester-app1
+            
+            # Check app2
+            echo "📊 App2 Status:"
+            kubectl get pods -n gruppe-5-tester-app2
+            kubectl get svc -n gruppe-5-tester-app2
+            
+            # Verify running pods in both namespaces
+            APP1_PODS=$(kubectl get pods -n gruppe-5-tester-app1 --field-selector=status.phase=Running --no-headers | wc -l)
+            APP2_PODS=$(kubectl get pods -n gruppe-5-tester-app2 --field-selector=status.phase=Running --no-headers | wc -l)
+            
+            if [ "$APP1_PODS" -eq 0 ] || [ "$APP2_PODS" -eq 0 ]; then
+              echo "❌ Not all apps have running pods"
+              exit 1
+            fi
+            echo "✅ All App-of-Apps components running successfully"
+          else
+            # Standard check for regular apps
+            echo "🔍 Verifying deployment in namespace '${{ matrix.app }}'"
+            kubectl get pods -n ${{ matrix.app }}
+            kubectl get svc -n ${{ matrix.app }}
 
-          RUNNING_PODS=$(kubectl get pods -n ${{ matrix.app }} --field-selector=status.phase=Running --no-headers | wc -l)
-          if [ "$RUNNING_PODS" -eq 0 ]; then
-            echo "❌ No running pods in namespace ${{ matrix.app }}"
-            exit 1
+            RUNNING_PODS=$(kubectl get pods -n ${{ matrix.app }} --field-selector=status.phase=Running --no-headers | wc -l)
+            if [ "$RUNNING_PODS" -eq 0 ]; then
+              echo "❌ No running pods in namespace ${{ matrix.app }}"
+              exit 1
+            fi
+            echo "✅ All pods running successfully"
           fi
-          echo "✅ All pods running successfully"
 
       - name: Verify ArgoCD Application
         run: |
