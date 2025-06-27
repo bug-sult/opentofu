@@ -1,4 +1,3 @@
-
 # OpenTofu GitOps Infrastructure
 
 Vollständig automatisierte Infrastruktur mit OpenTofu (Terraform), Kubernetes und GitOps über ArgoCD. Diese Lösung demonstriert eine produktionsreife Infrastruktur mit automatischer Bereitstellung und Synchronisation.
@@ -19,23 +18,61 @@ Vollständig automatisierte Infrastruktur mit OpenTofu (Terraform), Kubernetes u
 | **Example App Backend** | Node.js Express API | 30081 | ✅ Online |
 | **ArgoCD** | GitOps-Management-Interface | 30082 | ✅ Verfügbar |
 | **Keycloak** | Identity und Access Management | 30083 | ✅ Verfügbar |
-| **Gruppe5-Gute** | Custom Frontend mit Meme | 30084 | ⚡ Testing Workflow |
+| **Gruppe5-Gute** | Custom Frontend mit Meme | 30084 | ✅ Deployed |
 
 ## ⚡ Cluster Information
 
 **Aktueller Cluster:**
-- **Name/ID:** 5bb7bd96-e2ca-4e24-85f2-4bb34eae6ee0
+- **Name/ID:** 70a258fc-9ac9-44ae-b7d1-a7f291dc2ade
 - **Provider:** Exoscale SKS
-- **Region:** sks-at-vie-2 (Wien, Österreich)
-- **Endpoint:** https://5bb7bd96-e2ca-4e24-85f2-4bb34eae6ee0.sks-at-vie-2.exo.io:443
+- **Region:** at-vie-2 (Wien, Österreich)
+- **Nodes:** 2x standard.medium (Ready)
+- **Kubernetes Version:** v1.33.0
 - **Context:** kubernetes-admin
 
-**Anwendungs-URLs:**
-- Frontend: http://138.124.209.86:30080
-- Backend API: http://138.124.209.86:30081
-- ArgoCD: http://138.124.209.86:30082
-- Keycloak: http://138.124.209.86:30083
-- Gruppe5-Gute: http://138.124.209.86:30084
+**Worker Nodes:**
+- pool-32a8f-apafs (Ready)
+- pool-32a8f-gkhtm (Ready)
+
+## 🔧 Aktuelle Deployment-Konfiguration
+
+### Terraform-Ressourcen (✅ Erfolgreich erstellt)
+- **SKS Cluster:** 70a258fc-9ac9-44ae-b7d1-a7f291dc2ade
+- **Nodepool:** eab281eb-c7f6-45a2-89e9-83f123773340 (2 Nodes)
+- **Security Group:** fbf1dd25-d3bf-4afc-ac0b-121fe8caaf41
+- **ArgoCD:** Installiert und konfiguriert
+- **ArgoCD Applications:** 3 Apps automatisch deployed
+
+### Security Group Rules
+- **Kubelet:** TCP 10250 (Node-zu-Node Kommunikation)
+- **Calico VXLAN:** UDP 4789 (Container Networking)
+- **NodePort TCP:** TCP 30000-32767 (Externe Services)
+- **NodePort UDP:** UDP 30000-32767 (Externe Services)
+
+## 🛠️ Problemlösung: Node-Sichtbarkeit
+
+### Problem behoben: "Wieso sehe ich im Cluster keine Nodes?"
+
+**Ursache:** Terraform-Abhängigkeitsproblem - ArgoCD wurde vor dem Nodepool installiert, was zu einem Deadlock führte.
+
+**Lösung implementiert:**
+1. **Abhängigkeiten korrigiert:** ArgoCD hängt jetzt vom Nodepool ab
+2. **Security Group Konflikte gelöst:** Eindeutige Namen verwendet
+3. **Deployment-Reihenfolge optimiert:**
+   - ✅ SKS Cluster erstellen
+   - ✅ Security Groups und Rules erstellen
+   - ✅ Nodepool erstellen (2 Worker Nodes)
+   - ✅ ArgoCD installieren (nach verfügbaren Nodes)
+   - ✅ Applications deployen
+
+**Terraform-Konfiguration angepasst:**
+```hcl
+# argocd.tf - Korrigierte Abhängigkeit
+resource "helm_release" "argo_cd" {
+  depends_on = [exoscale_sks_nodepool.my_sks_nodepool]  # Geändert!
+  # ... weitere Konfiguration
+}
+```
 
 ## ⚡ Schnellstart
 
@@ -47,67 +84,67 @@ cd opentofu
 
 ### 2. Exoscale API-Schlüssel konfigurieren
 
-**GitHub Secrets einrichten:**
-1. Repository → Settings → Secrets and variables → Actions
-2. Folgende Secrets hinzufügen:
-   - `EXOSCALE_API_KEY`: Ihr Exoscale API Key
-   - `EXOSCALE_API_SECRET`: Ihr Exoscale API Secret
+**Terraform-Variablen setzen:**
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# Bearbeiten Sie terraform.tfvars mit Ihren Exoscale-Credentials
+```
 
-### 3. Automatische Bereitstellung
+**Erforderliche Variablen:**
+```hcl
+exoscale_api_key    = "EXO..."
+exoscale_api_secret = "..."
+cluster_name        = "gruppe5-cluster"
+exoscale_zone       = "at-vie-2"
+```
+
+### 3. Manuelle Bereitstellung
 
 ```bash
-# Änderungen committen und pushen
-git add .
-git commit -m "Initial deployment"
-git push origin main
+cd terraform
+terraform init
+terraform apply -auto-approve
 ```
 
 **Das passiert automatisch:**
 1. ✅ Kubernetes-Cluster wird auf Exoscale erstellt
-2. ✅ ArgoCD wird installiert und konfiguriert
-3. ✅ Keycloak Operator wird bereitgestellt (Version 26.0.7)
-4. ✅ Example App wird automatisch bereitgestellt
-5. ✅ URLs werden in den GitHub Actions Logs angezeigt
+2. ✅ 2 Worker-Nodes werden bereitgestellt
+3. ✅ ArgoCD wird installiert und konfiguriert
+4. ✅ 3 Anwendungen werden automatisch deployed:
+   - example-app (Frontend + Backend)
+   - keycloak (Identity Management)
+   - gruppe5-gute (Custom App)
 
-### 4. Zugriff auf Anwendungen
+### 4. Cluster-Status überprüfen
 
-Nach der Bereitstellung finden Sie die URLs in den GitHub Actions Logs:
+```bash
+# Nodes anzeigen
+kubectl --kubeconfig=kubeconfig get nodes
 
+# Alle Pods anzeigen
+kubectl --kubeconfig=kubeconfig get pods --all-namespaces
+
+# ArgoCD Applications
+kubectl --kubeconfig=kubeconfig -n argocd get applications
 ```
-Application URLs:
-ArgoCD UI: https://<node-ip>:30081
-Example App: http://<node-ip>:30080
-Keycloak: http://<node-ip>:30082
+
+### 5. Zugriff auf Anwendungen
+
+```bash
+# Node-IPs ermitteln
+kubectl --kubeconfig=kubeconfig get nodes -o wide
+
+# Services mit NodePorts anzeigen
+kubectl --kubeconfig=kubeconfig get svc --all-namespaces | grep NodePort
 ```
 
 ## 🔐 Standard-Anmeldedaten
 
-| Service | Benutzername | Passwort | URL | Hinweise |
-|---------|--------------|----------|-----|----------|
-| ArgoCD | admin | Siehe Befehl* | https://<node-ip>:31770 | *Siehe unten |
-| Keycloak | admin | admin | http://<node-ip>:30083 | Standard-Anmeldedaten |
-
-### Keycloak Zugriff
-
-1. **Admin Console aufrufen**:
-   - URL: `http://<node-ip>:30083/admin`
-   - Benutzername: `admin`
-   - Passwort: `admin`
-
-2. **Erste Anmeldung**:
-   - Öffnen Sie die Admin Console URL
-   - Geben Sie die Standard-Anmeldedaten ein
-   - Bei der ersten Anmeldung werden Sie aufgefordert, das Passwort zu ändern
-
-3. **Sicherheitshinweise**:
-   - Ändern Sie das Standard-Admin-Passwort sofort nach der ersten Anmeldung
-   - Aktivieren Sie 2FA für den Admin-Account
-   - Erstellen Sie separate Benutzer für die Administration
-
-4. **Realm Management**:
-   - Der Standard "Master" Realm ist für die Administration
-   - Erstellen Sie neue Realms für Ihre Anwendungen
-   - Konfigurieren Sie Clients, Rollen und Benutzer im jeweiligen Realm
+| Service | Benutzername | Passwort | Port | Hinweise |
+|---------|--------------|----------|------|----------|
+| ArgoCD | admin | Siehe Befehl* | 30082 | *Siehe unten |
+| Keycloak | admin | admin | 30083 | Standard-Anmeldedaten |
 
 *ArgoCD-Passwort abrufen:
 ```bash
@@ -130,62 +167,78 @@ kubectl --kubeconfig=terraform/kubeconfig -n argocd get secret \
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-## 🔄 GitOps-Workflow
+## 🔄 GitHub Actions Workflow
 
-1. **Code-Änderung** → Repository pushen
-2. **GitHub Actions** → Terraform apply (bei Infrastruktur-Änderungen)
-3. **ArgoCD** → Automatische Synchronisation der Anwendungen
-4. **Kubernetes** → Rolling Updates der Services
+### Automatisierte Bereitstellung aktivieren
 
-### Neue Anwendung hinzufügen
+1. **GitHub Secrets konfigurieren:**
+   - Repository → Settings → Secrets and variables → Actions
+   - Secrets hinzufügen:
+     - `EXOSCALE_API_KEY`: Ihr Exoscale API Key
+     - `EXOSCALE_API_SECRET`: Ihr Exoscale API Secret
 
-1. **Kubernetes-Manifeste erstellen:**
-```bash
-mkdir kubernetes/neue-app
-# Erstellen Sie namespace.yaml, deployment.yaml, service.yaml
+2. **Workflow-Datei überprüfen:**
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy Infrastructure
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+      - name: Deploy Infrastructure
+        env:
+          EXOSCALE_API_KEY: ${{ secrets.EXOSCALE_API_KEY }}
+          EXOSCALE_API_SECRET: ${{ secrets.EXOSCALE_API_SECRET }}
+        run: |
+          cd terraform
+          terraform init
+          terraform apply -auto-approve
 ```
 
-2. **ArgoCD-Konfiguration erweitern:**
-```hcl
-# In terraform/argocd.tf
-applications = [
-  # ... bestehende Apps
-  {
-    name      = "neue-app"
-    path      = "kubernetes/neue-app"
-    namespace = "neue-app"
-  }
-]
-```
-
-3. **Automatische Bereitstellung:**
+3. **Automatische Bereitstellung auslösen:**
 ```bash
 git add .
-git commit -m "Add neue-app"
+git commit -m "Trigger automated deployment"
 git push origin main
 ```
 
 ## 📊 Monitoring & Management
 
-### Status überprüfen
+### Cluster-Status überwachen
 ```bash
-# Alle Pods anzeigen
+# Node-Status
+kubectl --kubeconfig=terraform/kubeconfig get nodes -o wide
+
+# Pod-Status aller Namespaces
 kubectl --kubeconfig=terraform/kubeconfig get pods --all-namespaces
 
 # ArgoCD-Anwendungen
 kubectl --kubeconfig=terraform/kubeconfig -n argocd get applications
 
-# Example App Status
-kubectl --kubeconfig=terraform/kubeconfig get pods -n example-app
+# Services mit externen Ports
+kubectl --kubeconfig=terraform/kubeconfig get svc --all-namespaces | grep NodePort
 ```
 
-### Logs anzeigen
+### ArgoCD-Management
 ```bash
-# Example App Logs
-kubectl --kubeconfig=terraform/kubeconfig logs -n example-app deployment/example-frontend
+# ArgoCD UI Port-Forward (Alternative zu NodePort)
+kubectl --kubeconfig=terraform/kubeconfig port-forward svc/argocd-server -n argocd 8080:443
 
-# ArgoCD-Logs
-kubectl --kubeconfig=terraform/kubeconfig logs -n argocd deployment/argocd-server
+# ArgoCD CLI Installation und Login
+argocd login <node-ip>:30082 --username admin --password <password>
+
+# Anwendungen synchronisieren
+argocd app sync example-app
+argocd app sync keycloak
+argocd app sync gruppe5-gute
 ```
 
 ## 🔧 Skalierung
@@ -208,54 +261,62 @@ resource "exoscale_sks_nodepool" "my_sks_nodepool" {
 
 ## 🛠️ Troubleshooting
 
-### Häufige Probleme
+### Häufige Probleme und Lösungen
 
-**1. Pods starten nicht:**
+**1. Keine Nodes sichtbar:**
+```bash
+# Problem: ArgoCD vor Nodepool installiert
+# Lösung: Terraform-Abhängigkeiten korrigiert (bereits implementiert)
+kubectl --kubeconfig=terraform/kubeconfig get nodes
+```
+
+**2. Pods starten nicht:**
 ```bash
 kubectl --kubeconfig=terraform/kubeconfig describe pods -n <namespace>
+kubectl --kubeconfig=terraform/kubeconfig logs -n <namespace> <pod-name>
 ```
 
-**2. ArgoCD-Sync-Fehler:**
+**3. ArgoCD-Sync-Fehler:**
 ```bash
 kubectl --kubeconfig=terraform/kubeconfig -n argocd describe applications
+kubectl --kubeconfig=terraform/kubeconfig -n argocd logs deployment/argocd-application-controller
 ```
 
-**3. Service nicht erreichbar:**
+**4. Service nicht erreichbar:**
 ```bash
-# Node-IP prüfen
+# Node-IPs prüfen
 kubectl --kubeconfig=terraform/kubeconfig get nodes -o wide
 
 # Service-Status prüfen
 kubectl --kubeconfig=terraform/kubeconfig get svc --all-namespaces
+
+# Security Groups prüfen (Ports 30000-32767 müssen offen sein)
+```
+
+**5. Terraform State-Probleme:**
+```bash
+# State-Lock entfernen (falls nötig)
+cd terraform
+terraform force-unlock <lock-id>
+
+# State refreshen
+terraform refresh
 ```
 
 ## 🔒 Sicherheit
 
-- ✅ GitHub Secrets für sensible Daten
-- ✅ Automatische Updates über ArgoCD
+### Implementierte Sicherheitsmaßnahmen
+- ✅ Security Groups mit spezifischen Port-Regeln
+- ✅ Node-zu-Node Kommunikation beschränkt
+- ✅ Externe Zugriffe nur über NodePort-Range
+- ✅ ArgoCD mit RBAC-Konfiguration
+- ✅ Namespace-Isolation für Anwendungen
+
+### Sicherheitsempfehlungen
 - ⚠️ Standard-Passwörter in Produktion ändern
-- ⚠️ Security Groups vor Produktionseinsatz überprüfen
-
-## 🧪 Testen der GitOps-Pipeline
-
-### Test 1: Anwendung aktualisieren
-```bash
-# Ändern Sie z.B. die Replicas in kubernetes/example-app/deployment.yaml
-# Committen und pushen Sie die Änderung
-# ArgoCD synchronisiert automatisch
-```
-
-### Test 2: Rollback
-```bash
-# Über ArgoCD UI oder kubectl
-kubectl --kubeconfig=terraform/kubeconfig -n argocd app rollback example-app
-```
-
-### Test 3: Status überwachen
-```bash
-# ArgoCD Sync Status prüfen
-kubectl --kubeconfig=terraform/kubeconfig -n argocd get applications example-app -o yaml
-```
+- ⚠️ TLS-Zertifikate für externe Services konfigurieren
+- ⚠️ Network Policies für Pod-zu-Pod Kommunikation
+- ⚠️ Secrets-Management mit externen Tools (Vault, etc.)
 
 ## 📁 Projektstruktur
 
@@ -265,20 +326,28 @@ opentofu/
 │   └── deploy.yml              # GitHub Actions Pipeline
 ├── kubernetes/
 │   ├── example-app/           # Nginx Frontend + Node.js Backend Demo
-│   │   ├── deployment.yaml    # Deployment Konfiguration
-│   │   ├── service.yaml       # Service Konfiguration
+│   │   ├── deployment.yaml    # Frontend Deployment
+│   │   ├── backend-deployment.yaml # Backend Deployment
+│   │   ├── service.yaml       # Frontend Service (NodePort 30080)
+│   │   ├── backend-service.yaml # Backend Service (NodePort 30081)
 │   │   └── namespace.yaml     # Namespace Definition
-│   └── keycloak/             # Keycloak Identity Management
-│       ├── operator.yaml      # Keycloak Operator (v26.0.7)
-│       ├── keycloak.yaml      # Keycloak Instanz
-│       ├── crds.yaml          # Custom Resource Definitions
-│       ├── realm.yaml         # Realm Konfiguration
+│   ├── keycloak/             # Keycloak Identity Management
+│   │   ├── operator.yaml      # Keycloak Operator (v26.0.7)
+│   │   ├── keycloak.yaml      # Keycloak Instanz
+│   │   ├── crds.yaml          # Custom Resource Definitions
+│   │   ├── realm.yaml         # Realm Konfiguration
+│   │   └── namespace.yaml     # Namespace Definition
+│   └── gruppe5-gute/         # Custom Application
+│       ├── deployment.yaml    # App Deployment
+│       ├── service.yaml       # Service (NodePort 30084)
 │       └── namespace.yaml     # Namespace Definition
 ├── terraform/
-│   ├── main.tf               # Exoscale Cluster
+│   ├── main.tf               # Exoscale Cluster + Nodepool
 │   ├── argocd.tf            # ArgoCD Installation + App Config
 │   ├── app-values.yaml      # ArgoCD App Template
-│   └── variables.tf         # Variablen
+│   ├── variables.tf         # Variablen
+│   ├── provider.tf          # Provider Konfiguration
+│   └── terraform.tfvars     # Variablen-Werte (nicht in Git)
 └── README.md                 # Diese Dokumentation
 ```
 
@@ -287,15 +356,31 @@ opentofu/
 1. **Monitoring hinzufügen**: Prometheus + Grafana
 2. **Backup-Strategie**: Velero für Cluster-Backups
 3. **CI/CD erweitern**: Automatische Tests vor Deployment
-4. **Weitere Anwendungen**: Hinzufügen zusätzlicher Beispiel-Apps
+4. **Ingress Controller**: Nginx Ingress für bessere Routing
+5. **Cert-Manager**: Automatische TLS-Zertifikate
+
+## 📈 Deployment-Verlauf
+
+### Aktuelle Version (v2.0)
+- ✅ Node-Sichtbarkeitsproblem behoben
+- ✅ Terraform-Abhängigkeiten korrigiert
+- ✅ ArgoCD erfolgreich installiert
+- ✅ 3 Anwendungen automatisch deployed
+- ✅ Security Groups optimiert
+
+### Bekannte Probleme (behoben)
+- ~~Nodes nicht sichtbar~~ → **Behoben**: Abhängigkeiten korrigiert
+- ~~ArgoCD Installation hängt~~ → **Behoben**: Nodepool vor ArgoCD
+- ~~Security Group Namenskonflikte~~ → **Behoben**: Eindeutige Namen
 
 ## 📞 Support
 
 Bei Fragen oder Problemen:
-1. Überprüfen Sie die GitHub Actions Logs
+1. Überprüfen Sie die Terraform-Outputs
 2. Prüfen Sie ArgoCD UI für Sync-Status
 3. Verwenden Sie kubectl für detaillierte Diagnose
-4. Erstellen Sie ein Issue im Repository
+4. Überprüfen Sie die Security Group Regeln
+5. Erstellen Sie ein Issue im Repository
 
 ## 📄 Lizenz
 
@@ -303,5 +388,4 @@ Dieses Projekt steht unter der MIT-Lizenz - siehe LICENSE-Datei für Details.
 
 ---
 
-**Hinweis**: Das angegebene Repository `https://github.com/schdandan/AKT-G-5.git` war nicht verfügbar. Die aktuelle Konfiguration verwendet bewährte Beispielanwendungen zur Demonstration der GitOps-Pipeline.
-
+**Status**: ✅ **Vollständig funktionsfähig** - Cluster mit 2 Ready Nodes, ArgoCD installiert, 3 Anwendungen deployed

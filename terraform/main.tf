@@ -18,7 +18,7 @@ resource "exoscale_sks_nodepool" "my_sks_nodepool" {
 
 # (ad-hoc security group)
 resource "exoscale_security_group" "my_sks_security_group" {
-  name = "my-sks-security-group-new-1"
+  name = "my-sks-security-group-new-3"
 }
 
 resource "exoscale_security_group_rule" "kubelet" {

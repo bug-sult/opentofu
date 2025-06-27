@@ -1,5 +1,5 @@
 resource "helm_release" "argo_cd" {
-  depends_on = [local_sensitive_file.kubeconfig]
+  depends_on = [exoscale_sks_nodepool.my_sks_nodepool]
   name             = "argocd"
   repository       = "https://argoproj.github.io/argo-helm"
   chart            = "argo-cd"
