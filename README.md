@@ -304,3 +304,4 @@ Dieses Projekt steht unter der MIT-Lizenz - siehe LICENSE-Datei für Details.
 ---
 
 **Hinweis**: Das angegebene Repository `https://github.com/schdandan/AKT-G-5.git` war nicht verfügbar. Die aktuelle Konfiguration verwendet bewährte Beispielanwendungen zur Demonstration der GitOps-Pipeline.
+
