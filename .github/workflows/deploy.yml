@@ -9,60 +9,103 @@ on:
     branches: [ main, master ]
     paths:
       - 'kubernetes/**'
-  workflow_dispatch:  # Optional: manuelles Triggern
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  detect-apps:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect changed apps
+        id: set-matrix
+        run: |
+          echo "🔍 Scanning for changed apps in 'kubernetes/'..."
+          APPS=$(git diff --name-only ${{ github.event.before || github.sha }} ${{ github.sha }} \
+            | grep '^kubernetes/' \
+            | cut -d/ -f2 \
+            | sort -u \
+            | jq -R . | jq -s .)
+
+          if [ "$APPS" = "[]" ] || [ -z "$APPS" ]; then
+            echo "❌ No changed app folders detected. Exiting."
+            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+          else
+            echo "📦 Found changed apps: $APPS"
+            echo "matrix={\"include\":$(echo $APPS | jq '[.[] | {app: .}]')}" >> $GITHUB_OUTPUT
+          fi
+
+  deploy:
+    needs: detect-apps
+    if: needs.detect-apps.outputs.matrix != '{"include":[]}'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{fromJson(needs.detect-apps.outputs.matrix)}}
+    name: Deploy ${{ matrix.app }}
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
 
-    - name: Configure kubectl
-      run: |
-        mkdir -p $HOME/.kube
-        echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
 
+      - name: Validate Kubernetes manifests
+        run: |
+          APP_PATH="kubernetes/${{ matrix.app }}"
+          echo "🔍 Validating Kubernetes manifests in $APP_PATH"
 
-    - name: Deploy Kubernetes manifests
-      run: |
+          for file in namespace.yaml deployment.yaml service.yaml; do
+            if [ ! -f "$APP_PATH/$file" ]; then
+              echo "❌ Missing required file: $APP_PATH/$file"
+              exit 1
+            fi
+          done
 
-        kubectl apply -f "kubernetes/gruppe5-gute/"
+          kubectl --dry-run=client apply -f "$APP_PATH/namespace.yaml"
+          kubectl --dry-run=client apply -f "$APP_PATH/deployment.yaml"
+          kubectl --dry-run=client apply -f "$APP_PATH/service.yaml"
 
-        
-    - name: Detect modified app folder
-      id: detect
-      run: |
-        APP_FOLDER=$(git diff --name-only ${{ github.event.before || github.sha }} ${{ github.sha }} | grep '^kubernetes/' | cut -d/ -f2 | sort -u | head -n1)
-        if [ -z "$APP_FOLDER" ]; then
-          echo "❌ No application folder detected in 'kubernetes/'. Exiting."
-          exit 1
-        fi
-        echo "Detected app folder: $APP_FOLDER"
-        echo "app_name=$APP_FOLDER" >> "$GITHUB_OUTPUT"
+      - name: Deploy to Kubernetes
+        run: |
+          APP_PATH="kubernetes/${{ matrix.app }}"
+          echo "🚀 Deploying $APP_PATH"
 
-    
+          kubectl apply -f "$APP_PATH/namespace.yaml"
+          kubectl apply -f "$APP_PATH/deployment.yaml"
+          kubectl apply -f "$APP_PATH/service.yaml"
 
-    - name: Wait for Deployment to be ready
-      run: |
-        APP="${{ steps.detect.outputs.app_name }}"
-        DEPLOY_NAME="${APP}-frontend"
-        echo "⏳ Waiting for deployment $DEPLOY_NAME in namespace $APP..."
+      - name: Wait for rollout
+        run: |
+          echo "⏳ Waiting for deployment rollout..."
+          kubectl rollout status deployment/${{ matrix.app }}-frontend -n ${{ matrix.app }} --timeout=300s
 
-        for i in {1..30}; do
-          READY=$(kubectl get deploy -n $APP $DEPLOY_NAME -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
-          if [ "$READY" -ge 1 ]; then
-            echo "✅ Deployment is ready!"
-            break
+      - name: Post-deployment check
+        run: |
+          echo "🔍 Verifying deployment in namespace '${{ matrix.app }}'"
+          kubectl get pods -n ${{ matrix.app }}
+          kubectl get svc -n ${{ matrix.app }}
+
+          RUNNING_PODS=$(kubectl get pods -n ${{ matrix.app }} --field-selector=status.phase=Running --no-headers | wc -l)
+          if [ "$RUNNING_PODS" -eq 0 ]; then
+            echo "❌ No running pods in namespace ${{ matrix.app }}"
+            exit 1
           fi
-          echo "⌛ Versuch $i/30 – noch nicht bereit..."
-          sleep 10
-        done
+          echo "✅ All pods running successfully"
 
-        echo "📦 Aktuelle Pods:
+      - name: Apply ArgoCD Application (optional)
+        if: ${{ hashFiles(format('kubernetes/{0}/argocd-application.yaml', matrix.app)) != '' }}
+        run: |
+          echo "🔄 Applying ArgoCD Application"
+          kubectl apply -f "kubernetes/${{ matrix.app }}/argocd-application.yaml"
+
