@@ -16,7 +16,7 @@ spec:
       containers:
       - name: node
         image: node:alpine
-        command: ["node", "-e", "const http = require('http'); const server = http.createServer((req, res) => { res.writeHead(200, {'Content-Type': 'application/json'}); res.end(JSON.stringify({message: 'Hello from App2 Backend!', timestamp: new Date().toISOString(), service: 'gruppe-5-tester-app2'}));"}); server.listen(3000, () => console.log('Backend running on port 3000'));"]
+        command: ["node", "-e", "const http = require('http'); const server = http.createServer((req, res) => { res.writeHead(200, {'Content-Type': 'application/json'}); res.end(JSON.stringify({message: 'Hello from App2 Backend!', timestamp: new Date().toISOString(), service: 'gruppe-5-tester-app2'})); }); server.listen(3000, () => console.log('Backend running on port 3000'));"]
         ports:
         - containerPort: 3000
         resources:
