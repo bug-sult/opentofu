@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gruppe-5-tester-app1
+  namespace: gruppe-5-tester-app1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gruppe-5-tester-app1
+  template:
+    metadata:
+      labels:
+        app: gruppe-5-tester-app1
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: html-content
+          mountPath: /usr/share/nginx/html
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+      volumes:
+      - name: html-content
+        configMap:
+          name: gruppe-5-tester-app1-content
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gruppe-5-tester-app1-content
+  namespace: gruppe-5-tester-app1
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Gruppe-5-Tester App1 - Frontend</title>
+        <style>
+            body {
+                font-family: 'Arial', sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            .container {
+                background: white;
+                padding: 3rem;
+                border-radius: 20px;
+                box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+                text-align: center;
+                max-width: 800px;
+                width: 100%;
+            }
+            h1 {
+                color: #667eea;
+                margin-bottom: 1rem;
+                font-size: 3rem;
+            }
+            .subtitle {
+                color: #666;
+                margin-bottom: 2rem;
+                font-size: 1.2rem;
+            }
+            .status {
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                color: white;
+                padding: 1.5rem;
+                border-radius: 10px;
+                margin: 2rem 0;
+                font-weight: bold;
+            }
+            .app-info {
+                background: #f8f9fa;
+                padding: 2rem;
+                border-radius: 10px;
+                margin: 2rem 0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 App1 - Frontend</h1>
+            <p class="subtitle">Gruppe-5-Tester App-of-Apps Pattern</p>
+            
+            <div class="status">
+                ✅ App1 erfolgreich deployed über App-of-Apps Pattern!
+            </div>
+
+            <div class="app-info">
+                <h3>📋 App1 Details</h3>
+                <p><strong>Typ:</strong> Frontend Service</p>
+                <p><strong>Namespace:</strong> gruppe-5-tester-app1</p>
+                <p><strong>Port:</strong> 30091 (NodePort)</p>
+                <p><strong>Pattern:</strong> App-of-Apps</p>
+                <p><strong>Parent App:</strong> gruppe-5-tester</p>
+            </div>
+        </div>
+    </body>
+    </html>

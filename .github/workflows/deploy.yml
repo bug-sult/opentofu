@@ -76,24 +76,46 @@ jobs:
           kubectl --dry-run=client apply -f "$APP_PATH/deployment.yaml"
           kubectl --dry-run=client apply -f "$APP_PATH/service.yaml"
 
-          if [ -f "$APP_PATH/argocd-application.yaml" ]; then
-            echo "✅ Found ArgoCD Application manifest"
-            kubectl --dry-run=client apply -f "$APP_PATH/argocd-application.yaml"
-          else
-            echo "❌ Missing ArgoCD Application manifest"
-            exit 1
-          fi
-
       - name: Create ArgoCD Application
         run: |
-          APP_PATH="kubernetes/${{ matrix.app }}"
-          echo "🔄 Creating/Updating ArgoCD Application first"
+          APP_NAME="${{ matrix.app }}"
+          echo "🔄 Creating/Updating ArgoCD Application for $APP_NAME"
           
           # Ensure argocd namespace exists
           kubectl get namespace argocd || kubectl create namespace argocd
           
-          # Apply ArgoCD Application
-          kubectl apply -f "$APP_PATH/argocd-application.yaml"
+          # Check if ArgoCD Application file exists in root
+          if [ -f "$APP_NAME-argocd.yaml" ]; then
+            echo "✅ Found ArgoCD Application manifest: $APP_NAME-argocd.yaml"
+            kubectl apply -f "$APP_NAME-argocd.yaml"
+          else
+            echo "📝 Creating ArgoCD Application manifest for $APP_NAME"
+            cat > "$APP_NAME-argocd.yaml" << EOF
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: $APP_NAME
+            namespace: argocd
+            finalizers:
+              - resources-finalizer.argocd.argoproj.io
+          spec:
+            project: default
+            source:
+              repoURL: https://github.com/bug-sult/opentofu.git
+              targetRevision: HEAD
+              path: kubernetes/$APP_NAME
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: $APP_NAME
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+              - CreateNamespace=true
+          EOF
+            kubectl apply -f "$APP_NAME-argocd.yaml"
+          fi
           
           echo "✅ ArgoCD Application created/updated"
 
