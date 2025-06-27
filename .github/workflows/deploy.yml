@@ -1,216 +1,64 @@
-name: Deploy Infrastructure and Applications
+name: Deploy App
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
+    paths:
+      - 'kubernetes/**'
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:
-
-env:
-  EXOSCALE_API_KEY: ${{ secrets.EXOSCALE_API_KEY }}
-  EXOSCALE_API_SECRET: ${{ secrets.EXOSCALE_API_SECRET }}
+    branches: [ main, master ]
+    paths:
+      - 'kubernetes/**'
 
 jobs:
-  terraform:
-    name: 'Terraform Infrastructure & ArgoCD'
+  deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout
+    - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
+    - name: Detect app folder (auto)
+      id: detect
+      run: |
+        APP_FOLDER=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^kubernetes/' | cut -d/ -f2 | sort -u | head -n1)
+        echo "Detected folder: $APP_FOLDER"
+        echo "app_name=$APP_FOLDER" >> "$GITHUB_OUTPUT"
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
       with:
-        terraform_version: 1.5.0
+        version: 'latest'
 
-    - name: Terraform Init
+    - name: Configure kubectl
       run: |
-        cd terraform
-        terraform init
+        mkdir -p $HOME/.kube
+        echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
 
-    - name: Terraform Plan
+    - name: Deploy Kubernetes manifests
       run: |
-        cd terraform
-        terraform plan -var="exoscale_key=${{ secrets.EXOSCALE_API_KEY }}" -var="exoscale_secret=${{ secrets.EXOSCALE_API_SECRET }}"
-      
-    - name: Terraform Import bestehende Ressourcen
-      run: |
-        terraform import exoscale_sks_cluster.my_sks_cluster 70a258fc-9ac9-44ae-b7d1-a7f291dc2ade || true
-        terraform import exoscale_security_group.my_sks_security_group fbf1dd25-d3bf-4afc-ac0b-121fe8caaf41 || true
+        echo "🚀 Deploying ${{ steps.detect.outputs.app_name }}..."
+        APP="kubernetes/${{ steps.detect.outputs.app_name }}"
+        kubectl apply -f $APP/namespace.yaml
+        kubectl apply -f $APP/deployment.yaml
+        kubectl apply -f $APP/service.yaml
 
-    - name: Terraform Apply
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      continue-on-error: true
+    - name: Wait for Deployment to be ready
       run: |
-        cd terraform
-        terraform apply -auto-approve -var="exoscale_key=${{ secrets.EXOSCALE_API_KEY }}" -var="exoscale_secret=${{ secrets.EXOSCALE_API_SECRET }}" || echo "Terraform apply failed, continuing with existing cluster..."
+        NS="${{ steps.detect.outputs.app_name }}"
+        DEPLOY_NAME="${NS}-frontend"
+        echo "⏳ Waiting for deployment $DEPLOY_NAME to be ready in namespace $NS..."
+        kubectl rollout status deployment/$DEPLOY_NAME -n $NS --timeout=300s || true
 
-    - name: Check Cluster and Kubeconfig
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    - name: Health Check
       run: |
-        if [ -f terraform/kubeconfig ]; then
-          echo "✅ Terraform kubeconfig found"
-          echo "KUBECONFIG_EXISTS=true" >> $GITHUB_ENV
-          echo "KUBECONFIG_PATH=terraform/kubeconfig" >> $GITHUB_ENV
-          
-          # Test cluster connectivity
-          kubectl --kubeconfig=terraform/kubeconfig cluster-info
-          kubectl --kubeconfig=terraform/kubeconfig get nodes
+        NS="${{ steps.detect.outputs.app_name }}"
+        SVC="${NS}-service"
+        echo "🏥 Checking service endpoints for $SVC in $NS"
+        ENDPOINTS=$(kubectl get endpoints $SVC -n $NS -o jsonpath='{.subsets}' 2>/dev/null)
+        if [ -n "$ENDPOINTS" ] && [ "$ENDPOINTS" != "null" ]; then
+          echo "✅ Service is reachable"
         else
-          echo "❌ No kubeconfig found, skipping ArgoCD operations"
-          echo "KUBECONFIG_EXISTS=false" >> $GITHUB_ENV
+          echo "❌ Service has no endpoints!"
+          exit 1
         fi
-
-    - name: Wait for Nodes to be Ready
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
-      run: |
-        echo "⏳ Waiting for nodes to be ready..."
-        kubectl --kubeconfig=terraform/kubeconfig wait --for=condition=Ready nodes --all --timeout=300s
-        echo "✅ All nodes are ready"
-        kubectl --kubeconfig=terraform/kubeconfig get nodes -o wide
-
-    - name: Wait for ArgoCD to be Ready
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
-      run: |
-        echo "⏳ Waiting for ArgoCD to be ready..."
-        kubectl --kubeconfig=terraform/kubeconfig wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
-        kubectl --kubeconfig=terraform/kubeconfig wait --for=condition=available --timeout=600s deployment/argocd-application-controller -n argocd
-        echo "✅ ArgoCD is ready"
-
-    - name: Get ArgoCD Admin Password
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
-      run: |
-        echo "🔑 ArgoCD Admin Credentials:"
-        echo "Username: admin"
-        echo -n "Password: "
-        kubectl --kubeconfig=terraform/kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-        echo ""
-
-    - name: Verify ArgoCD Applications
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
-      run: |
-        echo "📋 Checking ArgoCD Applications..."
-        kubectl --kubeconfig=terraform/kubeconfig -n argocd get applications
-        
-        # Wait for applications to sync
-        echo "⏳ Waiting for applications to sync..."
-        sleep 30
-        
-        # Check application status
-        for app in example-app keycloak gruppe5-gute; do
-          echo "Checking $app..."
-          if kubectl --kubeconfig=terraform/kubeconfig -n argocd get application $app >/dev/null 2>&1; then
-            echo "✅ $app application exists"
-            kubectl --kubeconfig=terraform/kubeconfig -n argocd get application $app -o jsonpath='{.status.sync.status}' || echo "Status unknown"
-            echo ""
-          else
-            echo "❌ $app application not found"
-          fi
-        done
-
-    - name: Force Sync All Applications
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
-      run: |
-        echo "🔄 Force syncing all ArgoCD applications..."
-        
-        # Refresh and sync each application
-        for app in example-app keycloak gruppe5-gute; do
-          if kubectl --kubeconfig=terraform/kubeconfig -n argocd get application $app >/dev/null 2>&1; then
-            echo "Syncing $app..."
-            kubectl --kubeconfig=terraform/kubeconfig -n argocd patch application $app -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' --type=merge
-            kubectl --kubeconfig=terraform/kubeconfig -n argocd patch application $app -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' --type=merge
-          fi
-        done
-        
-        # Wait for sync to complete
-        echo "⏳ Waiting for sync to complete..."
-        sleep 60
-
-    - name: Check Application Deployments
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
-      run: |
-        echo "📊 Checking application deployments..."
-        
-        # Check all namespaces
-        kubectl --kubeconfig=terraform/kubeconfig get namespaces
-        
-        # Check pods in each application namespace
-        for ns in example-app keycloak gruppe5-gute; do
-          echo ""
-          echo "=== $ns namespace ==="
-          if kubectl --kubeconfig=terraform/kubeconfig get namespace $ns >/dev/null 2>&1; then
-            kubectl --kubeconfig=terraform/kubeconfig get pods -n $ns
-            kubectl --kubeconfig=terraform/kubeconfig get svc -n $ns
-          else
-            echo "❌ Namespace $ns not found"
-          fi
-        done
-
-    - name: Get Service URLs and Access Information
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
-      run: |
-        echo "🌐 Getting external access information..."
-        
-        # Get node external IP
-        NODE_IP=$(kubectl --kubeconfig=terraform/kubeconfig get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
-        if [ -z "$NODE_IP" ]; then
-          NODE_IP=$(kubectl --kubeconfig=terraform/kubeconfig get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
-        fi
-        
-        echo "🖥️  Node IP: $NODE_IP"
-        echo ""
-        echo "🚀 Application URLs:"
-        echo "┌─────────────────────────────────────────────────────────────┐"
-        echo "│                     Service Access URLs                    │"
-        echo "├─────────────────────────────────────────────────────────────┤"
-        echo "│ ArgoCD UI:        https://$NODE_IP:30082                    │"
-        echo "│ Example Frontend: http://$NODE_IP:30080                     │"
-        echo "│ Example Backend:  http://$NODE_IP:30081                     │"
-        echo "│ Keycloak:         http://$NODE_IP:30083                     │"
-        echo "│ Gruppe5-Gute:     http://$NODE_IP:30084                     │"
-        echo "└─────────────────────────────────────────────────────────────┘"
-        echo ""
-        echo "🔐 ArgoCD Login Credentials:"
-        echo "Username: admin"
-        echo -n "Password: "
-        kubectl --kubeconfig=terraform/kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-        echo ""
-        echo ""
-        echo "📋 All NodePort Services:"
-        kubectl --kubeconfig=terraform/kubeconfig get svc --all-namespaces | grep NodePort
-
-    - name: Final Status Summary
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.KUBECONFIG_EXISTS == 'true'
-      run: |
-        echo ""
-        echo "🎉 Deployment Summary:"
-        echo "✅ Kubernetes Cluster: Ready"
-        echo "✅ Worker Nodes: $(kubectl --kubeconfig=terraform/kubeconfig get nodes --no-headers | wc -l) Ready"
-        echo "✅ ArgoCD: Installed and Running"
-        echo "✅ Applications: Deployed via GitOps"
-        echo ""
-        echo "🔄 GitOps Status:"
-        kubectl --kubeconfig=terraform/kubeconfig -n argocd get applications -o custom-columns="NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status"
-        echo ""
-        echo "🚀 Infrastructure is ready for use!"
-
-  test-applications:
-    name: 'Test Application Connectivity'
-    runs-on: ubuntu-latest
-    needs: terraform
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      
-    - name: Test Application Endpoints
-      run: |
-        echo "🧪 Testing application connectivity..."
-        echo "Note: This is a basic connectivity test."
-        echo "Full testing requires the actual node IP and may need VPN access."
-        echo ""
-        echo "✅ Workflow completed successfully"
-        echo "✅ Infrastructure and applications should be accessible via the URLs shown above"
