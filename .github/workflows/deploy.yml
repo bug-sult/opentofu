@@ -29,6 +29,13 @@ jobs:
         mkdir -p $HOME/.kube
         echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
 
+
+    - name: Deploy Kubernetes manifests
+      run: |
+
+        kubectl apply -f "kubernetes/gruppe5-gute/"
+
+        
     - name: Detect modified app folder
       id: detect
       run: |
@@ -40,11 +47,7 @@ jobs:
         echo "Detected app folder: $APP_FOLDER"
         echo "app_name=$APP_FOLDER" >> "$GITHUB_OUTPUT"
 
-    - name: Deploy Kubernetes manifests
-      run: |
-
-        kubectl apply -f "kubernetes/gruppe5-gute/"
-
+    
 
     - name: Wait for Deployment to be ready
       run: |
