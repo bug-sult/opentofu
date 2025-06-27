@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-appl
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/gruppe5-gute/opentofu.git
+    targetRevision: HEAD
+    path: kubernetes/test-appl
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: test-appl
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

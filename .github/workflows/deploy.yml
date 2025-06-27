@@ -34,6 +34,11 @@ jobs:
       run: |
         cd terraform
         terraform plan -var="exoscale_key=${{ secrets.EXOSCALE_API_KEY }}" -var="exoscale_secret=${{ secrets.EXOSCALE_API_SECRET }}"
+      
+    - name: Terraform Import bestehende Ressourcen
+      run: |
+        terraform import exoscale_sks_cluster.my_sks_cluster 70a258fc-9ac9-44ae-b7d1-a7f291dc2ade || true
+        terraform import exoscale_security_group.my_sks_security_group fbf1dd25-d3bf-4afc-ac0b-121fe8caaf41 || true
 
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
