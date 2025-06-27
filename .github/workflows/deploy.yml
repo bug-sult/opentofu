@@ -117,13 +117,50 @@ jobs:
           # Ensure argocd namespace exists
           kubectl get namespace argocd || kubectl create namespace argocd
           
-          # Check if ArgoCD Application file exists in root
-          if [ -f "$APP_NAME-argocd.yaml" ]; then
-            echo "✅ Found ArgoCD Application manifest: $APP_NAME-argocd.yaml"
-            kubectl apply -f "$APP_NAME-argocd.yaml"
+          # Special handling for App-of-Apps pattern
+          if [ "${{ matrix.app }}" = "gruppe-5-tester" ]; then
+            echo "📦 Creating App-of-Apps ArgoCD Application"
+            # Check if ArgoCD Application file exists in root
+            if [ -f "$APP_NAME-argocd.yaml" ]; then
+              echo "✅ Found ArgoCD Application manifest: $APP_NAME-argocd.yaml"
+              kubectl apply -f "$APP_NAME-argocd.yaml"
+            else
+              echo "📝 Creating App-of-Apps ArgoCD Application manifest for $APP_NAME"
+              cat > "$APP_NAME-argocd.yaml" << EOF
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: $APP_NAME
+            namespace: argocd
+            finalizers:
+              - resources-finalizer.argocd.argoproj.io
+          spec:
+            project: default
+            source:
+              repoURL: https://github.com/bug-sult/opentofu.git
+              targetRevision: HEAD
+              path: kubernetes/$APP_NAME/child-applications
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: argocd
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+              - CreateNamespace=true
+          EOF
+              kubectl apply -f "$APP_NAME-argocd.yaml"
+            fi
           else
-            echo "📝 Creating ArgoCD Application manifest for $APP_NAME"
-            cat > "$APP_NAME-argocd.yaml" << EOF
+            # Standard ArgoCD Application creation
+            # Check if ArgoCD Application file exists in root
+            if [ -f "$APP_NAME-argocd.yaml" ]; then
+              echo "✅ Found ArgoCD Application manifest: $APP_NAME-argocd.yaml"
+              kubectl apply -f "$APP_NAME-argocd.yaml"
+            else
+              echo "📝 Creating ArgoCD Application manifest for $APP_NAME"
+              cat > "$APP_NAME-argocd.yaml" << EOF
           apiVersion: argoproj.io/v1alpha1
           kind: Application
           metadata:
@@ -147,7 +184,8 @@ jobs:
               syncOptions:
               - CreateNamespace=true
           EOF
-            kubectl apply -f "$APP_NAME-argocd.yaml"
+              kubectl apply -f "$APP_NAME-argocd.yaml"
+            fi
           fi
           
           echo "✅ ArgoCD Application created/updated"
