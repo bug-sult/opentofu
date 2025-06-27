@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gruppe-5-app3
+  namespace: gruppe-5-app3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gruppe-5-app3
+  template:
+    metadata:
+      labels:
+        app: gruppe-5-app3
+    spec:
+      containers:
+      - name: node
+        image: node:alpine
+        command: ["node", "-e", "const http = require('http'); const server = http.createServer((req, res) => { res.writeHead(200, {'Content-Type': 'application/json'}); res.end(JSON.stringify({message: 'Hello from App2 Backend!', timestamp: new Date().toISOString(), service: 'gruppe-5-app3'})); }); server.listen(3000, () => console.log('Backend running on port 3000'));"]
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 20
