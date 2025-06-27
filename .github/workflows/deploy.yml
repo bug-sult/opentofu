@@ -24,12 +24,21 @@ jobs:
         id: set-matrix
         run: |
           echo "🔍 Scanning for changed apps in 'kubernetes/'..."
-          APPS=$(git diff --name-only ${{ github.event.before || github.sha }} ${{ github.sha }} \
+          set -e
+          
+          # Fallback-Logik für den Vergleichs-Commit
+          if git cat-file -e ${{ github.event.before }} 2>/dev/null; then
+            BASE=${{ github.event.before }}
+          else
+            BASE=$(git rev-parse HEAD~1)
+          fi
+          
+          APPS=$(git diff --name-only $BASE ${{ github.sha }} \
             | grep '^kubernetes/' \
             | cut -d/ -f2 \
             | sort -u \
             | jq -R . | jq -s .)
-
+          
           if [ "$APPS" = "[]" ] || [ -z "$APPS" ]; then
             echo "❌ No changed app folders detected. Exiting."
             echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
