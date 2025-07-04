@@ -32,7 +32,7 @@ Eine moderne GitOps-basierte Infrastruktur, die OpenTofu (Terraform), Kubernetes
 ### Infrastruktur
 
 - **Cloud Provider**: Exoscale SKS
-- **Cluster Name**: Gruppe5-Cluster
+- **Cluster Name**: Gruppe5-Test
 - **Node Pool**: 2x standard.medium Instanzen
 - **Security Groups**: Konfiguriert für Kubernetes Services
 - **NodePort Range**: 30000-32767
@@ -131,9 +131,9 @@ kubectl get nodes -o wide
 Sie können den Fortschritt der Bereitstellung in der Exoscale Console verfolgen:
 
 1. **Exoscale Console**: https://portal.exoscale.com/
-2. **Compute** → **SKS (Scalable Kubernetes Service)**: Hier sehen Sie Ihren Cluster "Gruppe5-Cluster"
+2. **Compute** → **SKS (Scalable Kubernetes Service)**: Hier sehen Sie Ihren Cluster "Gruppe5-Test"
 3. **Compute** → **Security Groups**: Hier sehen Sie die Security Group "my-sks-security-group-new-1"
-4. **Compute** → **Instance Pools**: Hier sehen Sie den Nodepool "Gruppe5-Cluster-np"
+4. **Compute** → **Instance Pools**: Hier sehen Sie den Nodepool "gruppe5-test-np"
 
 ---
 
@@ -872,7 +872,6 @@ opentofu/
 │       ├── argocd-application.yaml
 │       ├── deployment.yaml
 │       ├── namespace.yaml
-│       ├── README.md
 │       └── service.yaml
 ├── terraform/                         # Infrastructure as Code
 │   ├── .terraform.lock.hcl
@@ -949,16 +948,6 @@ kubectl logs -n [NAMESPACE] [POD-NAME]
 # Service-Endpunkte prüfen
 kubectl get endpoints -n [NAMESPACE]
 ```
-
-### Performance-Metriken
-
-| Metrik | Aktueller Wert | Bewertung |
-|--------|----------------|-----------|
-| **Deployment Zeit** | 3-5 Minuten | ✅ Gut |
-| **Fehlerrate** | 0% | ✅ Ausgezeichnet |
-| **Automatisierungsgrad** | 95% | ✅ Sehr gut |
-| **Rollback-Fähigkeit** | Vollständig | ✅ Ausgezeichnet |
-| **Sync-Geschwindigkeit** | < 30 Sekunden | ✅ Sehr gut |
 
 ### Wartungsaufgaben
 
@@ -1101,56 +1090,6 @@ kubectl logs -n [NAMESPACE] [POD-NAME] -f
 
 ---
 
-## 🚀 Nächste Schritte
-
-### Kurzfristig (1-2 Wochen)
-- ✅ **Dokumentation konsolidiert** - Alle README-Dateien zusammengefasst
-- 🔄 **Monitoring Dashboard einrichten** - Grafana/Prometheus Installation
-- 🔄 **Notification System** - Slack/Teams Integration für Deployments
-- 🔄 **Security Hardening** - Passwörter ändern, HTTPS aktivieren
-
-### Mittelfristig (1-2 Monate)
-- 🔄 **Multi-Environment Support** - Dev/Staging/Prod Umgebungen
-- 🔄 **Automated Testing** - Unit Tests in CI/CD Pipeline
-- 🔄 **Security Scanning** - Container Image Vulnerability Scanning
-- 🔄 **Backup Automation** - Automatisierte Backup-Strategie
-
-### Langfristig (3-6 Monate)
-- 🔄 **GitOps Best Practices** - Advanced ArgoCD Patterns
-- 🔄 **Disaster Recovery** - Vollständige DR-Procedures
-- 🔄 **Performance Optimization** - Resource-Optimierung
-- 🔄 **Multi-Cluster Setup** - Cluster-übergreifende Deployments
-
----
-
-## 🤝 Contributing
-
-### Entwicklungsworkflow
-1. **Fork** das Repository
-2. **Feature Branch** erstellen: `git checkout -b feature/neue-funktion`
-3. **Änderungen committen**: `git commit -m "Add neue Funktion"`
-4. **Branch pushen**: `git push origin feature/neue-funktion`
-5. **Pull Request** erstellen
-
-### Code-Standards
-- **YAML-Validierung** vor Commit: `kubectl --dry-run=client apply -f [FILE]`
-- **Dokumentation aktualisieren** bei Änderungen
-- **Commit-Messages** in deutscher Sprache
-- **Resource Limits** für alle Container definieren
-
-### Testing
-```bash
-# Lokale Validierung
-kubectl --dry-run=client apply -f kubernetes/[APP-NAME]/
-
-# Syntax-Check für alle YAML-Dateien
-find kubernetes/ -name "*.yaml" -exec kubectl --dry-run=client apply -f {} \;
-
-# ArgoCD Application Validierung
-kubectl apply --dry-run=client -f [ARGOCD-APP].yaml
-```
-
----
 
 ## 📞 Support & Hilfe
 
@@ -1211,7 +1150,3 @@ Dieses Projekt ist unter der MIT-Lizenz lizenziert. Siehe [LICENSE](LICENSE) fü
 
 **🎯 Dieses Dokument enthält alle Informationen, die zuvor in separaten README-Dateien verteilt waren. Es bietet eine vollständige Anleitung für Setup, Deployment, Zugriff und Wartung der OpenTofu GitOps Infrastruktur.**
 
----
-
-*Letzte Aktualisierung: $(date)*
-*Dokumentation konsolidiert aus: README.md, APPLICATION_DEPLOYMENT_GUIDE.md, ARGOCD_ACCESS.md, WORKFLOW_PROCESS_DOCUMENTATION.md, DEPLOYMENT_GUIDE.md, ANWENDUNGSZUGRIFF.md, GITHUB_ACTIONS_WORKFLOW_REVIEW.md, KEYCLOAK_ACCESS.md, kubernetes/gruppe-5-tester/README.md und weiteren Dokumentationsdateien.*
