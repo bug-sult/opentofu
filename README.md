@@ -468,10 +468,21 @@ curl -I http://$NODE_IP:30085  # ArgoCD
 3. Applications Dashboard anzeigen
 4. Sync Status der Anwendungen prüfen
 
-#### ArgoCD Passwort zurücksetzen (falls nötig):
+#### ArgoCD Passwort abrufen:
 ```bash
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+# Base64-kodiertes Passwort abrufen
+kubectl --kubeconfig=terraform/kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"
+
+# Passwort dekodieren (Windows PowerShell)
+[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("HIER_BASE64_STRING_EINFÜGEN"))
+
+# Passwort dekodieren (Linux/macOS)
+kubectl --kubeconfig=terraform/kubeconfig -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 ```
+
+#### Aktuelles ArgoCD Passwort:
+- **Benutzername**: `admin`
+- **Passwort**: `Bk6VDcKKk0zCKj1Y`
 
 ### Keycloak Identity Management
 - **URL**: `http://[NODE-IP]:30083`
