@@ -1,3 +1,3 @@
-exoscale_key    = "EXOfc8e71d51910b043f30e20be"
-exoscale_secret = "vVZzfVTaRxDx64TguB651364UoOhIFsYUKiIVIbpghU"
-cluster_name    = "Gruppe5-Test"
+exoscale_key    = "EXO34cd292dc4143cd925fcc0a8"
+exoscale_secret = "9pcMsOvdTkwLAb9sn4fsU-cuZmVli4YK2gaTSrGtDRI"
+cluster_name    = "Gruppe5-Cluster"
