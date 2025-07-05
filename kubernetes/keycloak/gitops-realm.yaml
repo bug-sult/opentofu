@@ -1,0 +1,194 @@
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: gitops-realm
+  namespace: keycloak
+spec:
+  keycloakCRName: keycloak
+  realm:
+    realm: gitops-realm
+    enabled: true
+    displayName: GitOps Applications Realm
+    accessTokenLifespan: 300
+    ssoSessionIdleTimeout: 1800
+    ssoSessionMaxLifespan: 36000
+    offlineSessionIdleTimeout: 2592000
+    loginTheme: keycloak
+    accountTheme: keycloak
+    adminTheme: keycloak
+    emailTheme: keycloak
+    internationalizationEnabled: true
+    supportedLocales:
+      - en
+      - de
+    defaultLocale: en
+    clients:
+      - clientId: example-app
+        name: Example Application
+        enabled: true
+        protocol: openid-connect
+        publicClient: true
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        implicitFlowEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - "http://*:30080/*"
+          - "http://localhost:30080/*"
+          - "http://keycloak.local:30080/*"
+        webOrigins:
+          - "http://*:30080"
+          - "http://localhost:30080"
+          - "http://keycloak.local:30080"
+        attributes:
+          post.logout.redirect.uris: "+"
+          pkce.code.challenge.method: "S256"
+          access.token.lifespan: "300"
+        defaultClientScopes:
+          - web-origins
+          - acr
+          - profile
+          - roles
+          - email
+      - clientId: gruppe5-gute
+        name: Gruppe5 Gute Application
+        enabled: true
+        protocol: openid-connect
+        publicClient: true
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        implicitFlowEnabled: false
+        redirectUris:
+          - "http://*:30084/*"
+          - "http://localhost:30084/*"
+          - "http://keycloak.local:30084/*"
+        webOrigins:
+          - "http://*:30084"
+          - "http://localhost:30084"
+          - "http://keycloak.local:30084"
+        attributes:
+          post.logout.redirect.uris: "+"
+          pkce.code.challenge.method: "S256"
+        defaultClientScopes:
+          - web-origins
+          - acr
+          - profile
+          - roles
+          - email
+      - clientId: argocd
+        name: ArgoCD Application
+        enabled: true
+        protocol: openid-connect
+        publicClient: false
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        implicitFlowEnabled: false
+        serviceAccountsEnabled: true
+        redirectUris:
+          - "http://*:30085/auth/callback"
+          - "http://localhost:30085/auth/callback"
+          - "http://keycloak.local:30085/auth/callback"
+        webOrigins:
+          - "http://*:30085"
+          - "http://localhost:30085"
+          - "http://keycloak.local:30085"
+        attributes:
+          access.token.lifespan: "300"
+        defaultClientScopes:
+          - web-origins
+          - acr
+          - profile
+          - roles
+          - email
+          - groups
+    users:
+      - username: admin
+        enabled: true
+        firstName: Admin
+        lastName: User
+        email: admin@gitops.local
+        emailVerified: true
+        credentials:
+          - type: password
+            value: admin123
+            temporary: false
+        realmRoles:
+          - admin
+          - user
+        groups:
+          - /admins
+      - username: developer
+        enabled: true
+        firstName: Developer
+        lastName: User
+        email: developer@gitops.local
+        emailVerified: true
+        credentials:
+          - type: password
+            value: dev123
+            temporary: false
+        realmRoles:
+          - user
+          - developer
+        groups:
+          - /developers
+      - username: testuser
+        enabled: true
+        firstName: Test
+        lastName: User
+        email: test@gitops.local
+        emailVerified: true
+        credentials:
+          - type: password
+            value: test123
+            temporary: false
+        realmRoles:
+          - user
+        groups:
+          - /users
+    roles:
+      realm:
+        - name: admin
+          description: Administrator role with full access
+          composite: false
+          clientRole: false
+        - name: developer
+          description: Developer role with development access
+          composite: false
+          clientRole: false
+        - name: user
+          description: Regular user role
+          composite: false
+          clientRole: false
+    groups:
+      - name: admins
+        path: /admins
+        attributes:
+          description: ["System administrators"]
+        realmRoles:
+          - admin
+          - user
+      - name: developers
+        path: /developers
+        attributes:
+          description: ["Application developers"]
+        realmRoles:
+          - developer
+          - user
+      - name: users
+        path: /users
+        attributes:
+          description: ["Regular users"]
+        realmRoles:
+          - user
+    identityProviders: []
+    browserFlow: browser
+    registrationFlow: registration
+    directGrantFlow: direct grant
+    resetCredentialsFlow: reset credentials
+    clientAuthenticationFlow: clients
+    dockerAuthenticationFlow: docker auth
+    attributes:
+      frontendUrl: ""
+      requireSsl: "none"
+      sslRequired: "none"

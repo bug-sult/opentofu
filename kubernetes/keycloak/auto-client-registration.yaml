@@ -1,0 +1,185 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-client-registration
+  namespace: keycloak
+data:
+  register-client.sh: |
+    #!/bin/bash
+    
+    # Keycloak Auto Client Registration Script
+    # Verwendung: ./register-client.sh <app-name> <port>
+    
+    APP_NAME="$1"
+    PORT="$2"
+    KEYCLOAK_URL="http://keycloak-service.keycloak.svc.cluster.local:8080"
+    REALM="gitops-realm"
+    
+    if [ -z "$APP_NAME" ] || [ -z "$PORT" ]; then
+        echo "Verwendung: $0 <app-name> <port>"
+        echo "Beispiel: $0 meine-neue-app 30089"
+        exit 1
+    fi
+    
+    echo "🔐 Registriere neuen Keycloak Client: $APP_NAME"
+    
+    # Admin Token abrufen
+    echo "📡 Hole Admin Token..."
+    ADMIN_TOKEN=$(curl -s -X POST "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "username=admin" \
+        -d "password=admin123" \
+        -d "grant_type=password" \
+        -d "client_id=admin-cli" | jq -r '.access_token')
+    
+    if [ "$ADMIN_TOKEN" = "null" ] || [ -z "$ADMIN_TOKEN" ]; then
+        echo "❌ Fehler: Konnte Admin Token nicht abrufen"
+        exit 1
+    fi
+    
+    echo "✅ Admin Token erhalten"
+    
+    # Client-Konfiguration erstellen
+    CLIENT_CONFIG=$(cat <<EOF
+    {
+      "clientId": "$APP_NAME",
+      "name": "$APP_NAME Application",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://138.124.209.187:$PORT/*",
+        "http://138.124.209.191:$PORT/*",
+        "http://localhost:$PORT/*",
+        "*"
+      ],
+      "webOrigins": [
+        "http://138.124.209.187:$PORT",
+        "http://138.124.209.191:$PORT",
+        "http://localhost:$PORT",
+        "*"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "+",
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ]
+    }
+    EOF
+    )
+    
+    # Client registrieren
+    echo "📝 Registriere Client '$APP_NAME'..."
+    RESPONSE=$(curl -s -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "$CLIENT_CONFIG")
+    
+    # Prüfen ob Client bereits existiert
+    if echo "$RESPONSE" | grep -q "Client $APP_NAME already exists"; then
+        echo "⚠️  Client '$APP_NAME' existiert bereits"
+        
+        # Client ID abrufen
+        CLIENT_UUID=$(curl -s -X GET "$KEYCLOAK_URL/admin/realms/$REALM/clients?clientId=$APP_NAME" \
+            -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[0].id')
+        
+        if [ "$CLIENT_UUID" != "null" ] && [ -n "$CLIENT_UUID" ]; then
+            echo "🔄 Aktualisiere bestehenden Client..."
+            curl -s -X PUT "$KEYCLOAK_URL/admin/realms/$REALM/clients/$CLIENT_UUID" \
+                -H "Authorization: Bearer $ADMIN_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "$CLIENT_CONFIG"
+            echo "✅ Client '$APP_NAME' erfolgreich aktualisiert!"
+        fi
+    else
+        echo "✅ Client '$APP_NAME' erfolgreich registriert!"
+    fi
+    
+    echo ""
+    echo "🎯 Client-Details:"
+    echo "   Client-ID: $APP_NAME"
+    echo "   Port: $PORT"
+    echo "   Redirect URIs: http://138.124.209.187:$PORT/*"
+    echo "   Web Origins: http://138.124.209.187:$PORT"
+    echo ""
+    echo "🚀 Der Client ist jetzt einsatzbereit!"
+
+  auto-register-on-deploy.sh: |
+    #!/bin/bash
+    
+    # Automatische Client-Registrierung beim App-Deployment
+    # Wird von ArgoCD oder kubectl hooks aufgerufen
+    
+    APP_NAME="$1"
+    
+    if [ -z "$APP_NAME" ]; then
+        echo "❌ Fehler: APP_NAME nicht angegeben"
+        exit 1
+    fi
+    
+    # Port aus Service extrahieren
+    PORT=$(kubectl get service "${APP_NAME}-service" -n "$APP_NAME" -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null)
+    
+    if [ -z "$PORT" ]; then
+        echo "⚠️  Warnung: Konnte Port für $APP_NAME nicht ermitteln, verwende Standard-Port-Schema"
+        # Fallback: Port basierend auf App-Name generieren
+        PORT=$((30000 + $(echo "$APP_NAME" | cksum | cut -d' ' -f1) % 1000))
+    fi
+    
+    echo "🔍 Gefundene App: $APP_NAME auf Port: $PORT"
+    
+    # Client registrieren
+    /scripts/register-client.sh "$APP_NAME" "$PORT"
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-setup-clients
+  namespace: keycloak
+spec:
+  template:
+    spec:
+      containers:
+      - name: client-registration
+        image: curlimages/curl:latest
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            apk add --no-cache jq bash
+            
+            # Warte bis Keycloak bereit ist
+            echo "⏳ Warte auf Keycloak..."
+            until curl -s http://keycloak-service.keycloak.svc.cluster.local:8080/realms/gitops-realm > /dev/null; do
+              echo "Keycloak noch nicht bereit, warte 10 Sekunden..."
+              sleep 10
+            done
+            
+            echo "✅ Keycloak ist bereit!"
+            
+            # Registriere bestehende Clients
+            /scripts/register-client.sh "gruppe5-gute" "30084"
+            /scripts/register-client.sh "test-template-app" "30087"
+            /scripts/register-client.sh "example-app" "30080"
+            
+            echo "🎉 Alle Clients erfolgreich registriert!"
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+      volumes:
+      - name: scripts
+        configMap:
+          name: keycloak-client-registration
+          defaultMode: 0755
+      restartPolicy: OnFailure

@@ -1,0 +1,113 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: APP_NAME_PLACEHOLDER-keycloak-setup
+  namespace: APP_NAME_PLACEHOLDER
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    spec:
+      containers:
+      - name: keycloak-client-registration
+        image: curlimages/curl:latest
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            apk add --no-cache jq bash
+            
+            APP_NAME="APP_NAME_PLACEHOLDER"
+            KEYCLOAK_URL="http://keycloak-service.keycloak.svc.cluster.local:8080"
+            REALM="gitops-realm"
+            
+            # Port aus Service extrahieren
+            PORT=$(kubectl get service "${APP_NAME}-service" -n "$APP_NAME" -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "NODE_PORT_PLACEHOLDER")
+            
+            echo "🔐 Registriere Keycloak Client: $APP_NAME auf Port: $PORT"
+            
+            # Warte bis Keycloak bereit ist
+            echo "⏳ Warte auf Keycloak..."
+            until curl -s "$KEYCLOAK_URL/realms/$REALM" > /dev/null; do
+              echo "Keycloak noch nicht bereit, warte 10 Sekunden..."
+              sleep 10
+            done
+            
+            # Admin Token abrufen
+            echo "📡 Hole Admin Token..."
+            ADMIN_TOKEN=$(curl -s -X POST "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" \
+                -H "Content-Type: application/x-www-form-urlencoded" \
+                -d "username=admin" \
+                -d "password=admin123" \
+                -d "grant_type=password" \
+                -d "client_id=admin-cli" | jq -r '.access_token')
+            
+            if [ "$ADMIN_TOKEN" = "null" ] || [ -z "$ADMIN_TOKEN" ]; then
+                echo "❌ Fehler: Konnte Admin Token nicht abrufen"
+                exit 1
+            fi
+            
+            # Client-Konfiguration
+            CLIENT_CONFIG=$(cat <<EOF
+            {
+              "clientId": "$APP_NAME",
+              "name": "$APP_NAME Application",
+              "enabled": true,
+              "protocol": "openid-connect",
+              "publicClient": true,
+              "standardFlowEnabled": true,
+              "directAccessGrantsEnabled": true,
+              "implicitFlowEnabled": false,
+              "serviceAccountsEnabled": false,
+              "redirectUris": [
+                "http://138.124.209.187:$PORT/*",
+                "http://138.124.209.191:$PORT/*",
+                "http://localhost:$PORT/*",
+                "*"
+              ],
+              "webOrigins": [
+                "http://138.124.209.187:$PORT",
+                "http://138.124.209.191:$PORT",
+                "http://localhost:$PORT",
+                "*"
+              ],
+              "attributes": {
+                "post.logout.redirect.uris": "+",
+                "pkce.code.challenge.method": "S256"
+              },
+              "defaultClientScopes": [
+                "web-origins",
+                "acr",
+                "profile",
+                "roles",
+                "email"
+              ]
+            }
+            EOF
+            )
+            
+            # Prüfe ob Client bereits existiert
+            EXISTING_CLIENT=$(curl -s -X GET "$KEYCLOAK_URL/admin/realms/$REALM/clients?clientId=$APP_NAME" \
+                -H "Authorization: Bearer $ADMIN_TOKEN")
+            
+            if echo "$EXISTING_CLIENT" | jq -e '.[0]' > /dev/null; then
+                echo "🔄 Client '$APP_NAME' existiert bereits, aktualisiere..."
+                CLIENT_UUID=$(echo "$EXISTING_CLIENT" | jq -r '.[0].id')
+                curl -s -X PUT "$KEYCLOAK_URL/admin/realms/$REALM/clients/$CLIENT_UUID" \
+                    -H "Authorization: Bearer $ADMIN_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -d "$CLIENT_CONFIG"
+                echo "✅ Client '$APP_NAME' erfolgreich aktualisiert!"
+            else
+                echo "📝 Erstelle neuen Client '$APP_NAME'..."
+                curl -s -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients" \
+                    -H "Authorization: Bearer $ADMIN_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -d "$CLIENT_CONFIG"
+                echo "✅ Client '$APP_NAME' erfolgreich erstellt!"
+            fi
+            
+            echo "🎉 Keycloak-Setup für $APP_NAME abgeschlossen!"
+      restartPolicy: OnFailure
+      serviceAccountName: default

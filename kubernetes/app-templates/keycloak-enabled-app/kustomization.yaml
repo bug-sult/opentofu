@@ -1,0 +1,51 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+
+replacements:
+  - source:
+      kind: Kustomization
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Namespace
+        fieldPaths:
+          - metadata.name
+      - select:
+          kind: Deployment
+        fieldPaths:
+          - metadata.namespace
+          - spec.selector.matchLabels.app
+          - spec.template.metadata.labels.app
+      - select:
+          kind: Service
+        fieldPaths:
+          - metadata.namespace
+          - spec.selector.app
+      - select:
+          kind: ConfigMap
+        fieldPaths:
+          - metadata.namespace
+
+namePrefix: ""
+nameSuffix: ""
+
+configMapGenerator:
+  - name: app-content
+    literals:
+      - app-name=PLACEHOLDER
+    options:
+      disableNameSuffixHash: true
+
+vars:
+  - name: APP_NAME
+    objref:
+      kind: ConfigMap
+      name: app-content
+      apiVersion: v1
+    fieldref:
+      fieldpath: data.app-name

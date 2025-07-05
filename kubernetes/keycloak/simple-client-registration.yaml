@@ -1,0 +1,130 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-simple-client-registration
+  namespace: keycloak
+spec:
+  template:
+    spec:
+      containers:
+      - name: client-registration
+        image: alpine:latest
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            # Installiere curl
+            apk add --no-cache curl
+            
+            KEYCLOAK_URL="http://keycloak-service.keycloak.svc.cluster.local:8080"
+            REALM="gitops-realm"
+            
+            echo "🔐 Starte einfache Keycloak Client-Registrierung"
+            
+            # Warte bis Keycloak bereit ist
+            echo "⏳ Warte auf Keycloak..."
+            until curl -s "$KEYCLOAK_URL/realms/$REALM" > /dev/null; do
+              echo "Keycloak noch nicht bereit, warte 10 Sekunden..."
+              sleep 10
+            done
+            
+            echo "✅ Keycloak ist bereit!"
+            
+            # Admin Token abrufen (ohne jq)
+            echo "📡 Hole Admin Token..."
+            TOKEN_RESPONSE=$(curl -s -X POST "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" \
+                -H "Content-Type: application/x-www-form-urlencoded" \
+                -d "username=admin" \
+                -d "password=admin123" \
+                -d "grant_type=password" \
+                -d "client_id=admin-cli")
+            
+            # Token extrahieren (einfache sed-Lösung)
+            ADMIN_TOKEN=$(echo "$TOKEN_RESPONSE" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+            
+            if [ -z "$ADMIN_TOKEN" ]; then
+                echo "❌ Fehler: Konnte Admin Token nicht abrufen"
+                echo "Response: $TOKEN_RESPONSE"
+                exit 1
+            fi
+            
+            echo "✅ Admin Token erhalten (${#ADMIN_TOKEN} Zeichen)"
+            
+            # Funktion zum Registrieren eines Clients
+            register_client() {
+                local CLIENT_ID="$1"
+                local PORT="$2"
+                local NAME="$3"
+                
+                echo "📝 Registriere Client: $CLIENT_ID auf Port $PORT"
+                
+                # Prüfe ob Client bereits existiert
+                EXISTING_CHECK=$(curl -s -X GET "$KEYCLOAK_URL/admin/realms/$REALM/clients?clientId=$CLIENT_ID" \
+                    -H "Authorization: Bearer $ADMIN_TOKEN")
+                
+                if echo "$EXISTING_CHECK" | grep -q "\"clientId\":\"$CLIENT_ID\""; then
+                    echo "⚠️  Client '$CLIENT_ID' existiert bereits - überspringe"
+                    return 0
+                fi
+                
+                # Client-Konfiguration (vereinfacht)
+                CLIENT_CONFIG="{
+                  \"clientId\": \"$CLIENT_ID\",
+                  \"name\": \"$NAME\",
+                  \"enabled\": true,
+                  \"protocol\": \"openid-connect\",
+                  \"publicClient\": true,
+                  \"standardFlowEnabled\": true,
+                  \"directAccessGrantsEnabled\": true,
+                  \"implicitFlowEnabled\": false,
+                  \"serviceAccountsEnabled\": false,
+                  \"redirectUris\": [
+                    \"http://138.124.209.187:$PORT/*\",
+                    \"http://138.124.209.191:$PORT/*\",
+                    \"http://localhost:$PORT/*\",
+                    \"*\"
+                  ],
+                  \"webOrigins\": [
+                    \"http://138.124.209.187:$PORT\",
+                    \"http://138.124.209.191:$PORT\",
+                    \"http://localhost:$PORT\",
+                    \"*\"
+                  ],
+                  \"attributes\": {
+                    \"post.logout.redirect.uris\": \"+\",
+                    \"pkce.code.challenge.method\": \"S256\"
+                  }
+                }"
+                
+                # Client erstellen
+                RESPONSE=$(curl -s -w "%{http_code}" -X POST "$KEYCLOAK_URL/admin/realms/$REALM/clients" \
+                    -H "Authorization: Bearer $ADMIN_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -d "$CLIENT_CONFIG")
+                
+                HTTP_CODE="${RESPONSE: -3}"
+                if [ "$HTTP_CODE" = "201" ]; then
+                    echo "✅ Client '$CLIENT_ID' erfolgreich erstellt!"
+                elif [ "$HTTP_CODE" = "409" ]; then
+                    echo "⚠️  Client '$CLIENT_ID' existiert bereits"
+                else
+                    echo "❌ Fehler beim Erstellen von '$CLIENT_ID' (HTTP: $HTTP_CODE)"
+                    echo "Response: ${RESPONSE%???}"
+                fi
+            }
+            
+            # Registriere alle benötigten Clients
+            register_client "gruppe5-gute" "30084" "Gruppe5 Gute Application"
+            register_client "test-template-app" "30087" "Test Template Application"
+            register_client "example-app" "30080" "Example Application"
+            
+            echo ""
+            echo "🎉 Client-Registrierung abgeschlossen!"
+            echo ""
+            echo "📋 Verarbeitete Clients:"
+            echo "   - gruppe5-gute (Port 30084)"
+            echo "   - test-template-app (Port 30087)"
+            echo "   - example-app (Port 30080)"
+            echo ""
+            echo "🔐 Clients sind jetzt für Keycloak-Authentifizierung verfügbar!"
+      restartPolicy: OnFailure

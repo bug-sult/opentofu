@@ -1,0 +1,126 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-fix-redirect-uris
+  namespace: keycloak
+spec:
+  template:
+    spec:
+      containers:
+      - name: fix-redirect-uris
+        image: alpine:latest
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            # Installiere curl
+            apk add --no-cache curl
+            
+            KEYCLOAK_URL="http://keycloak-service.keycloak.svc.cluster.local:8080"
+            REALM="gitops-realm"
+            
+            echo "🔧 Korrigiere Redirect-URIs für alle Clients"
+            
+            # Warte bis Keycloak bereit ist
+            echo "⏳ Warte auf Keycloak..."
+            until curl -s "$KEYCLOAK_URL/realms/$REALM" > /dev/null; do
+              echo "Keycloak noch nicht bereit, warte 10 Sekunden..."
+              sleep 10
+            done
+            
+            # Admin Token abrufen
+            echo "📡 Hole Admin Token..."
+            TOKEN_RESPONSE=$(curl -s -X POST "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" \
+                -H "Content-Type: application/x-www-form-urlencoded" \
+                -d "username=admin" \
+                -d "password=admin123" \
+                -d "grant_type=password" \
+                -d "client_id=admin-cli")
+            
+            ADMIN_TOKEN=$(echo "$TOKEN_RESPONSE" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+            
+            if [ -z "$ADMIN_TOKEN" ]; then
+                echo "❌ Fehler: Konnte Admin Token nicht abrufen"
+                exit 1
+            fi
+            
+            echo "✅ Admin Token erhalten"
+            
+            # Funktion zum Aktualisieren eines Clients
+            update_client() {
+                local CLIENT_ID="$1"
+                local PORT="$2"
+                
+                echo "🔧 Aktualisiere Client: $CLIENT_ID"
+                
+                # Client UUID abrufen
+                CLIENT_DATA=$(curl -s -X GET "$KEYCLOAK_URL/admin/realms/$REALM/clients?clientId=$CLIENT_ID" \
+                    -H "Authorization: Bearer $ADMIN_TOKEN")
+                
+                CLIENT_UUID=$(echo "$CLIENT_DATA" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
+                
+                if [ -z "$CLIENT_UUID" ]; then
+                    echo "❌ Client $CLIENT_ID nicht gefunden"
+                    return 1
+                fi
+                
+                echo "📝 Client UUID: $CLIENT_UUID"
+                
+                # Aktualisierte Client-Konfiguration
+                CLIENT_CONFIG="{
+                  \"id\": \"$CLIENT_UUID\",
+                  \"clientId\": \"$CLIENT_ID\",
+                  \"enabled\": true,
+                  \"protocol\": \"openid-connect\",
+                  \"publicClient\": true,
+                  \"standardFlowEnabled\": true,
+                  \"directAccessGrantsEnabled\": true,
+                  \"implicitFlowEnabled\": false,
+                  \"serviceAccountsEnabled\": false,
+                  \"redirectUris\": [
+                    \"http://138.124.209.187:$PORT/*\",
+                    \"http://138.124.209.191:$PORT/*\",
+                    \"http://localhost:$PORT/*\"
+                  ],
+                  \"webOrigins\": [
+                    \"http://138.124.209.187:$PORT\",
+                    \"http://138.124.209.191:$PORT\",
+                    \"http://localhost:$PORT\",
+                    \"*\"
+                  ],
+                  \"attributes\": {
+                    \"post.logout.redirect.uris\": \"+\",
+                    \"pkce.code.challenge.method\": \"S256\"
+                  }
+                }"
+                
+                # Client aktualisieren
+                RESPONSE=$(curl -s -w "%{http_code}" -X PUT "$KEYCLOAK_URL/admin/realms/$REALM/clients/$CLIENT_UUID" \
+                    -H "Authorization: Bearer $ADMIN_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -d "$CLIENT_CONFIG")
+                
+                HTTP_CODE="${RESPONSE: -3}"
+                if [ "$HTTP_CODE" = "204" ]; then
+                    echo "✅ Client '$CLIENT_ID' erfolgreich aktualisiert!"
+                else
+                    echo "❌ Fehler beim Aktualisieren von '$CLIENT_ID' (HTTP: $HTTP_CODE)"
+                    echo "Response: ${RESPONSE%???}"
+                fi
+            }
+            
+            # Alle Clients aktualisieren
+            update_client "gruppe5-gute" "30084"
+            update_client "test-template-app" "30087"
+            update_client "example-app" "30080"
+            
+            echo ""
+            echo "🎉 Redirect-URI Korrektur abgeschlossen!"
+            echo ""
+            echo "📋 Aktualisierte Clients:"
+            echo "   - gruppe5-gute: http://138.124.209.187:30084/*"
+            echo "   - test-template-app: http://138.124.209.187:30087/*"
+            echo "   - example-app: http://138.124.209.187:30080/*"
+            echo ""
+            echo "🔐 Clients sollten jetzt korrekt funktionieren!"
+      restartPolicy: OnFailure

@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gruppe5-gute
-  namespace: gruppe5-gute
+  name: test-template-app
+  namespace: test-template-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: gruppe5-gute
+      app: test-template-app
   template:
     metadata:
       labels:
-        app: gruppe5-gute
+        app: test-template-app
     spec:
       containers:
-      - name: gruppe5-gute
+      - name: test-template-app
         image: nginx:alpine
         ports:
         - containerPort: 80
@@ -28,28 +28,16 @@ spec:
           limits:
             memory: "64Mi"
             cpu: "200m"
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 80
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 80
-          initialDelaySeconds: 5
-          periodSeconds: 5
       volumes:
       - name: html-content
         configMap:
-          name: gruppe5-gute-content
+          name: test-template-app-content
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: gruppe5-gute-content
-  namespace: gruppe5-gute
+  name: test-template-app-content
+  namespace: test-template-app
 data:
   index.html: |
     <!DOCTYPE html>
@@ -57,7 +45,7 @@ data:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Gruppe 5 - Gute App mit Keycloak</title>
+        <title>test-template-app - Keycloak Auth</title>
         <script src="https://cdn.jsdelivr.net/npm/keycloak-js@21.1.1/dist/keycloak.min.js"></script>
         <style>
             body {
@@ -122,8 +110,9 @@ data:
     </head>
     <body>
         <div class="container">
-            <h1>🔐 Gruppe 5 - Gute App</h1>
+            <h1>🔐 test-template-app</h1>
             <p>Sichere Anwendung mit Keycloak-Authentifizierung</p>
+            <p><strong>🎯 Template-System erfolgreich getestet!</strong></p>
             
             <div id="loading" class="loading">
                 <h3>🔄 Authentifizierung wird initialisiert...</h3>
@@ -139,7 +128,8 @@ data:
             <div id="authenticated-content" style="display: none;">
                 <div class="authenticated">
                     <h3>✅ Erfolgreich authentifiziert!</h3>
-                    <p>Willkommen in Gruppe 5 - Gute App</p>
+                    <p>Willkommen in test-template-app</p>
+                    <p><strong>🚀 Automatische Client-ID: test-template-app</strong></p>
                 </div>
 
                 <div id="user-info" style="text-align: left; background: #f5f5f5; padding: 15px; border-radius: 10px; margin: 15px 0;">
@@ -159,7 +149,7 @@ data:
             const keycloakConfig = {
                 url: window.location.protocol + '//' + window.location.hostname + ':30083',
                 realm: 'gitops-realm',
-                clientId: 'gruppe5-gute'  // ← Automatisch gleich dem App-Namen
+                clientId: 'test-template-app'  // ← Automatisch gleich dem App-Namen
             };
 
             let keycloak;
@@ -223,7 +213,7 @@ data:
                         <p><strong>📧 E-Mail:</strong> ${userInfo.email}</p>
                         <p><strong>🎭 Rollen:</strong> ${userInfo.roles.length > 0 ? userInfo.roles.join(', ') : 'Keine Rollen'}</p>
                         <p><strong>🔑 Token gültig bis:</strong> ${new Date(keycloak.tokenParsed.exp * 1000).toLocaleString('de-DE')}</p>
-                        <p><strong>🏢 App:</strong> gruppe5-gute</p>
+                        <p><strong>🏢 App:</strong> test-template-app</p>
                         <p><strong>🌐 Realm:</strong> ${keycloak.realm}</p>
                     `;
                 }
@@ -268,7 +258,7 @@ data:
 
             // Beim Laden der Seite
             document.addEventListener('DOMContentLoaded', function() {
-                console.log('Starte gruppe5-gute mit Keycloak-Integration');
+                console.log('Starte test-template-app mit Keycloak-Integration');
                 initKeycloak();
             });
 
